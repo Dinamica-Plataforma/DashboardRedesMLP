@@ -64,12 +64,12 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
     >
       {/* Encabezado con título y botón cerrar */}
       <div className="sticky top-0 bg-white/95 backdrop-blur-sm pb-4 mb-4 border-b border-gray-200 flex justify-between items-start">
-        <h2 className="text-xl font-bold text-[#186170] whitespace-normal break-words pr-8">
+        <h2 className="text-[30px] font-[700] text-[#00718b] whitespace-normal break-words pr-8">
           {data?.nombre}
         </h2>
         <button onClick={onClose} aria-label="Cerrar" className="p-2 ml-2 rounded-full hover:bg-gray-100 transition">
-          <svg className="w-5 h-5 text-[#186170]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg className="w-5 h-5 text-[#00718b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
@@ -78,20 +78,20 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
       <div className="flex w-full mb-6">
         <button
           onClick={() => setActiveTab('general')}
-          className={`flex-1 px-3 py-1.5 rounded-l-lg text-sm font-medium transition-all duration-200
+          className={`flex-1 px-3 py-1.5 rounded-l-lg text-[16px] font-[600] transition-all duration-200
             ${activeTab === 'general'
-              ? 'bg-[#186170] text-white shadow-md'
-              : 'bg-gray-100 text-[#186170] hover:bg-[#186170]/10'
+              ? 'bg-[#00718b] text-white shadow-md'
+              : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
             }`}
         >
           General
         </button>
         <button
           onClick={() => setActiveTab('actores')}
-          className={`flex-1 px-3 py-1.5 rounded-r-lg text-sm font-medium transition-all duration-200
+          className={`flex-1 px-3 py-1.5 rounded-r-lg text-[16px] font-[600] transition-all duration-200
             ${activeTab === 'actores'
-              ? 'bg-[#186170] text-white shadow-md'
-              : 'bg-gray-100 text-[#186170] hover:bg-[#186170]/10'
+              ? 'bg-[#00718b] text-white shadow-md'
+              : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
             }`}
         >
           Actores
@@ -104,47 +104,47 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
           {/* Conexiones en una fila */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-              <div className="text-sm font-medium text-[#186170] mb-1">Conexiones Entrantes</div>
-              <div className="text-sm text-gray-900">{data.conexionesEntrantes}</div>
+              <div className="text-[14px] font-[600] text-[#00718b] mb-1">Conexiones Entrantes</div>
+              <div className="text-[30px] font-[600] text-[#575756]">{data.conexionesEntrantes}</div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-              <div className="text-sm font-medium text-[#186170] mb-1">Conexiones Salientes</div>
-              <div className="text-sm text-gray-900">{data.conexionesSalientes}</div>
+              <div className="text-[14px] font-[600] text-[#00718b] mb-1">Conexiones Salientes</div>
+              <div className="text-[30px] font-[600] text-[#575756]">{data.conexionesSalientes}</div>
             </div>
           </div>
 
           {/* Estados en una fila */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-              <div className="text-sm font-medium text-[#186170] mb-1">CB</div>
-              <div className={`text-sm font-medium ${
-                data.cb?.toLowerCase().trim() === 'bajo' ? 'text-green-600' :
-                data.cb?.toLowerCase().trim() === 'medio' ? 'text-yellow-600' :
-                data.cb?.toLowerCase().trim() === 'alto' ? 'text-red-600' :
-                'text-gray-900'
-              }`}>
+              <div className="text-[14px] font-[600] text-[#00718b] mb-1">CB</div>
+              <div className={`text-[20px] ${
+                data.cb?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
+                data.cb?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
+                data.cb?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
+                'font-medium'
+              } text-[#575756]`}>
                 {data.cb}
               </div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-              <div className="text-sm font-medium text-[#186170] mb-1">EVU</div>
-              <div className={`text-sm font-medium ${
-                data.evu?.toLowerCase().trim() === 'bajo' ? 'text-green-600' :
-                data.evu?.toLowerCase().trim() === 'medio' ? 'text-yellow-600' :
-                data.evu?.toLowerCase().trim() === 'alto' ? 'text-red-600' :
-                'text-gray-900'
-              }`}>
+              <div className="text-[14px] font-[600] text-[#00718b] mb-1">EVU</div>
+              <div className={`text-[20px] ${
+                data.evu?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
+                data.evu?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
+                data.evu?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
+                'font-medium'
+              } text-[#575756]`}>
                 {data.evu}
               </div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-              <div className="text-sm font-medium text-[#186170] mb-1">LP</div>
-              <div className={`text-sm font-medium ${
-                data.lp?.toLowerCase().trim() === 'bajo' ? 'text-green-600' :
-                data.lp?.toLowerCase().trim() === 'medio' ? 'text-yellow-600' :
-                data.lp?.toLowerCase().trim() === 'alto' ? 'text-red-600' :
-                'text-gray-900'
-              }`}>
+              <div className="text-[14px] font-[600] text-[#00718b] mb-1">LP</div>
+              <div className={`text-[20px] ${
+                data.lp?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
+                data.lp?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
+                data.lp?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
+                'font-medium'
+              } text-[#575756]`}>
                 {data.lp}
               </div>
             </div>

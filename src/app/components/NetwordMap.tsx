@@ -22,10 +22,30 @@ interface NodeInfo {
   lp: string;
 }
 
+// Constantes para el desplazamiento y animación
+const INFO_TABLE_EFFECTIVE_WIDTH_PX = 300; // Ancho estimado en píxeles del InfoTable
+const ANIMATION_DURATION = 300;
+const EASING_FUNCTION = 'easeInOutQuad';
+
 const NetworkMap: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [fixedNodePositions, setFixedNodePositions] = useState<Record<IdType, {x: number, y: number}> | null>(null);
+  const initialPositionsRef = useRef<Record<IdType, {x: number, y: number}> | null>(null);
+  const networkInitializedRef = useRef(false);
+  const physicsEnabledRef = useRef(true);
+
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
+  const selectedNodeRef = useRef(selectedNode);
+  useEffect(() => { selectedNodeRef.current = selectedNode; }, [selectedNode]);
+
   const [isInfoVisible, setIsInfoVisible] = useState(false);
+  const isInfoVisibleRef = useRef(isInfoVisible);
+  useEffect(() => { isInfoVisibleRef.current = isInfoVisible; }, [isInfoVisible]);
+
+  const [isPanelCausingShift, setIsPanelCausingShift] = useState(false);
+  const isPanelCausingShiftRef = useRef(isPanelCausingShift);
+  useEffect(() => { isPanelCausingShiftRef.current = isPanelCausingShift; }, [isPanelCausingShift]);
+
   const networkRef = useRef<Network | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const edgesDsRef = useRef<DataSet<Edge> | null>(null);
@@ -35,22 +55,50 @@ const NetworkMap: React.FC = () => {
   const temporalidadRef = useRef<TemporalidadMatrix | null>(null);
   const matrixRef = useRef<Matrix | null>(null);
 
-  const handleNodeDeselect = () => {
+  const performDeselectActions = (shouldMoveMap: boolean) => {
+    if (networkRef.current && shouldMoveMap) {
+      const currentPosition = networkRef.current.getViewPosition();
+      const currentScale = networkRef.current.getScale();
+      // Evitar división por cero o escalas extremadamente pequeñas si la librería lo permitiera
+      const safeScale = Math.max(currentScale, 0.01); 
+      const shiftInCanvasCoordinates = (INFO_TABLE_EFFECTIVE_WIDTH_PX / 2) / safeScale;
+      
+      networkRef.current.moveTo({
+        position: { x: currentPosition.x + shiftInCanvasCoordinates, y: currentPosition.y },
+        animation: { duration: ANIMATION_DURATION, easingFunction: EASING_FUNCTION },
+      });
+      setIsPanelCausingShift(false);
+    }
     if (networkRef.current) {
       networkRef.current.unselectAll();
     }
     setSelectedNode(null);
     setIsInfoVisible(false);
   };
+  
+  const handleNodeDeselect = () => { // Usada por InfoTable onClose
+    performDeselectActions(isPanelCausingShift); // Accede al estado isPanelCausingShift directamente
+  };
 
-  const handleNodeSelect = (nodeId: number, matrix: Matrix, temporalidad: TemporalidadMatrix, inDegree: Record<number, number>, outDegree: Record<number, number>) => {
+  // Esta función es llamada desde los callbacks de la red, usa refs para estados que lee.
+  const handleNodeSelectInternal = (nodeId: number, matrix: Matrix, temporalidad: TemporalidadMatrix, inDegree: Record<number, number>, outDegree: Record<number, number>) => {
     const nodeIndex = temporalidad.index.indexOf(matrix.columns[nodeId]);
-    
     if (nodeIndex !== -1) {
-      // Primero ocultamos la InfoTable
-      setIsInfoVisible(false);
+      const panelWasVisible = isInfoVisibleRef.current; // Leer de ref
+      const MismoNodoSeleccionado = selectedNodeRef.current?.nombre === matrix.columns[nodeId];
+
+      // Si el panel ya está visible para este nodo, no es necesario hacer mucho, solo asegurarse que esté seleccionado.
+      // La lógica de deselección por clic en mismo nodo está en el manejador de 'click'.
+      if (panelWasVisible && MismoNodoSeleccionado) {
+        networkRef.current?.selectNodes([nodeId], false); // Asegurar que el nodo de la librería esté seleccionado
+        return;
+      }
       
-      // Forzamos un pequeño delay para asegurar la transición
+      // Si el panel estaba visible (para otro nodo), ocultarlo momentáneamente para refrescar contenido.
+      if (panelWasVisible && !MismoNodoSeleccionado) {
+        setIsInfoVisible(false);
+      }
+      
       setTimeout(() => {
         const nodeInfo: NodeInfo = {
           nombre: matrix.columns[nodeId],
@@ -61,68 +109,140 @@ const NetworkMap: React.FC = () => {
           lp: temporalidad.data[nodeIndex][2],
         };
         setSelectedNode(nodeInfo);
-        // Mostramos la InfoTable con los nuevos datos
         setIsInfoVisible(true);
+
+        // Mover el mapa si el panel NO estaba visible antes.
+        if (networkRef.current && !panelWasVisible) {
+          const currentPosition = networkRef.current.getViewPosition();
+          const currentScale = networkRef.current.getScale();
+          // Evitar división por cero o escalas extremadamente pequeñas
+          const safeScale = Math.max(currentScale, 0.01);
+          const shiftInCanvasCoordinates = (INFO_TABLE_EFFECTIVE_WIDTH_PX / 2) / safeScale;
+
+          networkRef.current.moveTo({
+            position: { x: currentPosition.x - shiftInCanvasCoordinates, y: currentPosition.y },
+            animation: { duration: ANIMATION_DURATION, easingFunction: EASING_FUNCTION },
+          });
+          setIsPanelCausingShift(true);
+        }
       }, 50);
     }
   };
 
-  const handleRandomize = () => {
-    if (!networkRef.current || !nodesDsRef.current) return;
+  const handleReset = () => {
+    if (!networkRef.current || !nodesDsRef.current || !edgesDsRef.current || !initialPositionsRef.current) return;
 
-    // Obtener todos los nodos
+    // Desactivar la física temporalmente mientras reposicionamos
+    networkRef.current.setOptions({ physics: { enabled: false } });
+
+    // Obtener las conexiones actuales
+    const edges = edgesDsRef.current.get();
+
+    // Actualizar posiciones de nodos
     const nodes = nodesDsRef.current.get();
-    
-    // Generar nuevas posiciones aleatorias
-    const newPositions = nodes.map(node => ({
-      id: node.id,
-      x: Math.random() * 1000 - 500, // Rango de -500 a 500
-      y: Math.random() * 1000 - 500  // Rango de -500 a 500
+    const updatedNodes = nodes.map(node => ({
+      ...node,
+      x: initialPositionsRef.current?.[node.id as IdType]?.x,
+      y: initialPositionsRef.current?.[node.id as IdType]?.y
     }));
 
-    // Aplicar las nuevas posiciones
-    nodesDsRef.current.update(newPositions);
-    
-    // Reiniciar la física
+    // Limpiar el DataSet completamente
+    nodesDsRef.current.clear();
+    edgesDsRef.current.clear();
+
+    // Volver a añadir nodos y conexiones
+    nodesDsRef.current.add(updatedNodes);
+    edgesDsRef.current.add(edges);
+
+    // Forzar una actualización completa
+    networkRef.current.setData({
+      nodes: nodesDsRef.current,
+      edges: edgesDsRef.current
+    });
+
+    // Forzar actualización visual
+    networkRef.current.redraw();
+
+    // Reactivar la física inmediatamente
+    networkRef.current.setOptions({
+      physics: {
+        enabled: true,
+        solver: 'repulsion',
+        stabilization: {
+          enabled: true,
+          iterations: 200,
+          updateInterval: 50,
+          fit: true
+        },
+        repulsion: {
+          nodeDistance: 130,
+          centralGravity: 0.2,
+          springLength: 300,
+          springConstant: 0.01
+        }
+      }
+    });
+    physicsEnabledRef.current = true;
+  };
+
+  const handleRandomize = () => {
+    if (!networkRef.current || !nodesDsRef.current || !edgesDsRef.current) return;
+
+    // Activar la física
+    networkRef.current.setOptions({
+      physics: {
+        enabled: true,
+        solver: 'repulsion',
+        stabilization: {
+          enabled: true,
+          iterations: 200,
+          updateInterval: 50,
+          fit: true
+        },
+        repulsion: {
+          nodeDistance: 130,
+          centralGravity: 0.2,
+          springLength: 300,
+          springConstant: 0.01
+        }
+      }
+    });
+    physicsEnabledRef.current = true;
+
+    // Obtener las conexiones actuales
+    const edges = edgesDsRef.current.get();
+
+    // Generar nuevas posiciones aleatorias
+    const nodes = nodesDsRef.current.get();
+    const randomizedNodes = nodes.map(node => ({
+      ...node,
+      x: Math.random() * 1000 - 500,
+      y: Math.random() * 1000 - 500
+    }));
+
+    // Limpiar y recargar los datos
+    nodesDsRef.current.clear();
+    edgesDsRef.current.clear();
+    nodesDsRef.current.add(randomizedNodes);
+    edgesDsRef.current.add(edges);
+
+    // Actualizar la red
+    networkRef.current.setData({
+      nodes: nodesDsRef.current,
+      edges: edgesDsRef.current
+    });
+
     networkRef.current.stabilize(100);
   };
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || networkInitializedRef.current) return;
+    networkInitializedRef.current = true;
 
-    // Ocultar tooltip nativo
-    const styleEl = document.createElement('style');
-    styleEl.textContent = `.vis-tooltip { display: none !important; }`;
-    document.head.appendChild(styleEl);
-
-    // Crear tooltip personalizado
-    const tooltip = document.createElement('div');
-    Object.assign(tooltip.style, {
-      position: 'fixed',
-      pointerEvents: 'none',
-      padding: '8px',
-      background: 'rgba(255,255,255,0.95)',
-      border: '1px solid #ccc',
-      borderRadius: '4px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-      maxWidth: '200px',
-      whiteSpace: 'normal',
-      overflowWrap: 'break-word',
-      wordWrap: 'break-word',
-      fontSize: '12px',
-      lineHeight: '1.4',
-      opacity: '0',
-      transition: 'opacity 0.2s ease-in-out',
-      display: 'none',
-      zIndex: '9999',
-    });
-    document.body.appendChild(tooltip);
-    tooltipRef.current = tooltip;
-
+    // Variables para el tooltip
     let lastMousePos = { x: 0, y: 0 };
     let currentEdge: IdType | null = null;
     let animationFrameId: number;
-    // eslint-disable-next-line prefer-const
     let hoverTimeout: NodeJS.Timeout | null = null;
     let hideTimeout: NodeJS.Timeout | null = null;
     let lastEdgeId: IdType | null = null;
@@ -137,7 +257,6 @@ const NetworkMap: React.FC = () => {
     const showTooltip = (edge: Edge) => {
       if (!tooltipRef.current) return;
       
-      // Limpiar timeouts existentes
       if (hoverTimeout) clearTimeout(hoverTimeout);
       if (hideTimeout) clearTimeout(hideTimeout);
       
@@ -188,7 +307,6 @@ const NetworkMap: React.FC = () => {
               }
             }
             
-            // Actualizar posición del tooltip
             if (tooltipRef.current) {
               const m = 10;
               let tx = lastMousePos.x + m;
@@ -214,82 +332,55 @@ const NetworkMap: React.FC = () => {
       animationFrameId = requestAnimationFrame(detectLoop);
     };
 
-    const options: Options = {
-      nodes: { 
-        font: { 
-            size: 15,
-            face: 'ui-sans-serif, system-ui',
-            strokeColor: '#ffffff',
-            strokeWidth: 1.5
-        } 
-      },
-      edges: {
-        color: {
-          color: '#a1a1a1',
-          hover: '#2a5159',
-          highlight: '#15292d',
-          inherit: false
-        },
-        arrows: { to: { enabled: true, scaleFactor: 1 } },
-        scaling: {
-          min: 1,
-          max: 3,
-          label: { enabled: true, min: 14, max: 30, maxVisible: 30, drawThreshold: 5 },
-        },
-        hoverWidth: 0,
-        selectionWidth: 0
-      },
-      physics: {
-        // 🔄 Selecciona el solver "repulsion"
-        solver: 'repulsion',
-        stabilization: {
-          enabled: true,
-          iterations: 200,
-          updateInterval: 50,
-          fit: true,
-        },
-        // ⚙️ Parámetros propios de repulsion
-        repulsion: {
-          nodeDistance: 130,    // distancia mínima en px entre nodos
-          centralGravity: 0.2,  // opcional: para centrar ligeramente
-          springLength: 300,    // resorte virtual para "rebote"
-          springConstant: 0.01, // rigidez del resorte
-        },
-      },
-      interaction: { 
-        hover: true,
-        selectable: true,
-        selectConnectedEdges: true,
-        multiselect: false,
-        hoverConnectedEdges: true,
-        zoomView: true,
-        dragView: true
-      },
-      manipulation: {
-        enabled: false
-      }
-    };
+    // Ocultar tooltip nativo
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `.vis-tooltip { display: none !important; }`;
+    document.head.appendChild(styleEl);
 
+    // Crear tooltip personalizado
+    const tooltip = document.createElement('div');
+    Object.assign(tooltip.style, {
+      position: 'fixed',
+      pointerEvents: 'none',
+      padding: '8px',
+      background: 'rgba(255,255,255,0.95)',
+      border: '1px solid #ccc',
+      borderRadius: '4px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      maxWidth: '200px',
+      whiteSpace: 'normal',
+      overflowWrap: 'break-word',
+      wordWrap: 'break-word',
+      fontSize: '12px',
+      lineHeight: '1.4',
+      opacity: '0',
+      transition: 'opacity 0.2s ease-in-out',
+      display: 'none',
+      zIndex: '9999',
+    });
+    document.body.appendChild(tooltip);
+    tooltipRef.current = tooltip;
+
+    // Inicializar la red después de cargar todos los datos
     Promise.all([
+      fetch('/data/node_positions.json').then(r => r.json()).catch(() => null),
       fetch(MATRIX_PATH).then(r => r.json()),
       fetch(TYPE_PATH).then(r => r.json()),
       fetch(TEMPORALIDAD_PATH).then(r => r.json()),
     ])
-      .then(([matrix, typeMatrix, temporalidad]: [Matrix, TypeMatrix, TemporalidadMatrix]) => {
-        // Guardar matrix en la ref
+      .then(([positions, matrix, typeMatrix, temporalidad]: [Record<IdType, {x: number, y: number}> | null, Matrix, TypeMatrix, TemporalidadMatrix]) => {
+        // Guardar datos en refs
         matrixRef.current = matrix;
+        temporalidadRef.current = temporalidad;
+        setFixedNodePositions(positions);
+        initialPositionsRef.current = positions;
 
-        // Extraer targets únicos
+        // Configurar targets
         const uniqueTargets = Array.from(new Set(matrix.columns)).sort();
         setTargets(['todos', ...uniqueTargets]);
 
-        // Guardar temporalidad en la ref
-        temporalidadRef.current = temporalidad;
-
-        // Mapeo de ancho por nivel de vínculo
-        const widthByLevel: Record<number, number> = { 1: 2, 2: 4, 3: 6 };
-
-        // Calcular grado entrante y saliente
+        // Preparar edges y calcular grados
+        const opacityByLevel: Record<number, number> = { 1: 0.2, 2: 0.6, 3: 1.0 };
         const inDegree: Record<number, number> = {};
         const outDegree: Record<number, number> = {};
         const edges: Edge[] = [];
@@ -302,62 +393,120 @@ const NetworkMap: React.FC = () => {
               const tipo = typeMatrix.data[i][j] || '-';
               const nivelNum = w;
               const nivelText = nivelNum === 1 ? 'Bajo' : nivelNum === 2 ? 'Medio' : 'Alto';
-
               edges.push({
                 from: i,
                 to: j,
-                arrows: { to: true },
-                value: widthByLevel[nivelNum] || 2,
+                color: { color: '#575756', opacity: opacityByLevel[nivelNum] || 1.0 },
                 smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
-                title:
-                  `<strong>Desde:</strong> ${matrix.columns[i]}<br/>` +
-                  `<strong>Hasta:</strong> ${matrix.columns[j]}<br/>` +
-                  `<strong>Nivel de vínculo:</strong> ${nivelText}<br/>` +
-                  `<strong>Tipo de vínculo:</strong> ${tipo}`,
+                title: `<strong>Desde:</strong> ${matrix.columns[i]}<br/>` +
+                       `<strong>Hasta:</strong> ${matrix.columns[j]}<br/>` +
+                       `<strong>Nivel de vínculo:</strong> ${nivelText}<br/>` +
+                       `<strong>Tipo de vínculo:</strong> ${tipo}`,
               });
             }
           });
         });
 
-        // Crear nodos con color y tamaño según grado entrante
+        // Crear nodos
         const nodes: Node[] = matrix.columns.map((label, idx) => {
-          const degree = inDegree[idx] || 0;
-          const size = 16 + degree * 1.5;
-          
-          const maxSize = 16 + Math.max(...Object.values(inDegree)) * 1.5;
-          const minSize = 16;
-          const ratio = (size - minSize) / (maxSize - minSize);
-          
-          const r = Math.round(24 + (230 - 24) * ratio);
-          const g = Math.round(97 + (57 - 97) * ratio);
-          const b = Math.round(112 + (70 - 112) * ratio);
+          const degree = outDegree[idx] || 0;
+          const size = 5 + degree * 4.5;
+          const position = positions ? positions[idx.toString() as IdType] : undefined;
           
           return {
             id: idx,
             label,
             shape: 'dot',
-            color: { 
-              background: `rgb(${r},${g},${b})`,
-              border: `rgb(${r},${g},${b})`
-            },
+            x: position?.x,
+            y: position?.y,
+            color: { background: '#78c7c9', border: '#00718b' },
             size: size,
           };
         });
 
+        // Crear datasets
         const nodesDs = new DataSet(nodes);
         nodesDsRef.current = nodesDs;
         const edgesDs = new DataSet(edges);
         edgesDsRef.current = edgesDs;
 
+        // Configuración de la red
+        const options: Options = {
+          nodes: {
+            font: {
+              size: 20,
+              strokeColor: '#ffffff',
+              strokeWidth: 1.5,
+              multi: true,
+              color: '#575756'
+            },
+            color: {
+              background: '#78c7c9',
+              border: '#00718b',
+              hover: {
+                background: '#3C9CAA',
+                border: '#00718b',
+              },
+              highlight: {
+                background: '#00718b',
+                border: '#00718b',
+              },
+            },
+            widthConstraint: { maximum: 250 },
+            fixed: false
+          },
+          edges: {
+            color: {
+              color: '#575756',
+              hover: '#00718b',
+              highlight: '#d51224',
+              inherit: false
+            },
+            arrows: {
+              to: { enabled: false },
+              middle: {
+                enabled: true,
+                scaleFactor: 1,
+                type: 'vee'
+              }
+            },
+            width: 2,
+            hoverWidth: 0,
+            selectionWidth: 0
+          },
+          physics: {
+            enabled: true,
+            solver: 'repulsion',
+            stabilization: {
+              enabled: true,
+              iterations: 200,
+              updateInterval: 50,
+              fit: true
+            },
+            repulsion: {
+              nodeDistance: 130,
+              centralGravity: 0.2,
+              springLength: 300,
+              springConstant: 0.01
+            }
+          },
+          interaction: {
+            hover: true,
+            selectable: true,
+            selectConnectedEdges: true,
+            multiselect: false,
+            hoverConnectedEdges: true,
+            zoomView: true,
+            dragView: true,
+            dragNodes: true
+          }
+        };
+
         // Inicializar red
-        const network = new Network(
-          containerRef.current!,
-          { nodes: nodesDs, edges: edgesDs },
-          options
-        );
+        const network = new Network(containerRef.current!, { nodes: nodesDs, edges: edgesDs }, options);
         networkRef.current = network;
 
-        // Configurar límites de zoom y movimiento
+        // Configurar límites de zoom
         let isZooming = false;
         network.on('zoom', (params) => {
           if (isZooming) return;
@@ -386,8 +535,8 @@ const NetworkMap: React.FC = () => {
           const containerHeight = containerRef.current?.clientHeight || 0;
           
           // Calcular límites basados en el zoom actual
-          const maxX = containerWidth * scale;
-          const maxY = containerHeight * scale;
+          const maxX = containerWidth * 0.5;
+          const maxY = containerHeight * 0.5;
           
           // Ajustar la posición si está fuera de los límites
           if (Math.abs(view.x) > maxX || Math.abs(view.y) > maxY) {
@@ -404,85 +553,175 @@ const NetworkMap: React.FC = () => {
           }
         });
 
-        // Manejar clic en nodo
-        network.on('click', (params) => {
-          if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            // Si es el mismo nodo, deseleccionarlo
-            if (selectedNode && selectedNode.nombre === matrix.columns[nodeId]) {
-              handleNodeDeselect();
-            } else {
-              // Si es un nodo diferente, seleccionarlo
-              handleNodeSelect(nodeId, matrix, temporalidad, inDegree, outDegree);
-            }
-          } else {
-            handleNodeDeselect();
+        // Añadir evento para reactivar las físicas cuando se mueva un nodo
+        network.on('dragStart', () => {
+          if (!physicsEnabledRef.current) {
+            network.setOptions({
+              physics: {
+                enabled: true,
+                solver: 'repulsion',
+                stabilization: {
+                  enabled: true,
+                  iterations: 200,
+                  updateInterval: 50,
+                  fit: true
+                },
+                repulsion: {
+                  nodeDistance: 130,
+                  centralGravity: 0.2,
+                  springLength: 300,
+                  springConstant: 0.01
+                }
+              }
+            });
+            physicsEnabledRef.current = true;
           }
         });
 
-        // Manejar doble clic en nodo
-        network.on('doubleClick', (params) => {
+        // Configurar eventos de la red
+        network.on('click', (params) => {
+          const currentMatrix = matrixRef.current;
+          const currentTemporalidad = temporalidadRef.current;
+          if (!currentMatrix || !currentTemporalidad) return;
+
+          // Los grados inDegree y outDegree se calculan una vez en el scope del useEffect principal
+          // y se capturan aquí. Deberían ser los correctos para la red actual.
+          
           if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            // Si es el mismo nodo, deseleccionarlo
-            if (selectedNode && selectedNode.nombre === matrix.columns[nodeId]) {
-              handleNodeDeselect();
+            const nodeId = params.nodes[0] as number;
+            // Usar selectedNodeRef para obtener el estado actual del nodo seleccionado
+            if (selectedNodeRef.current && selectedNodeRef.current.nombre === currentMatrix.columns[nodeId]) {
+              // Clic en el mismo nodo seleccionado -> deseleccionar
+              performDeselectActions(isPanelCausingShiftRef.current); // Usa el valor del ref
             } else {
-              // Si es un nodo diferente, seleccionarlo
-              handleNodeSelect(nodeId, matrix, temporalidad, inDegree, outDegree);
+              // Clic en un nodo diferente (o ningún nodo seleccionado previamente) -> seleccionar
+              handleNodeSelectInternal(nodeId, currentMatrix, currentTemporalidad, inDegree, outDegree);
+            }
+          } else {
+            // Clic fuera de cualquier nodo -> deseleccionar
+            performDeselectActions(isPanelCausingShiftRef.current); // Usa el valor del ref
+          }
+        });
+
+        network.on('doubleClick', (params) => {
+          const currentMatrix = matrixRef.current;
+          const currentTemporalidad = temporalidadRef.current;
+          if (!currentMatrix || !currentTemporalidad) return;
+
+          if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0] as number;
+            if (selectedNodeRef.current && selectedNodeRef.current.nombre === currentMatrix.columns[nodeId]) {
+              // Doble clic en el mismo nodo -> deseleccionar
+              performDeselectActions(isPanelCausingShiftRef.current); // Usa el valor del ref
+            } else {
+              // Doble clic en un nodo diferente -> seleccionar
+              handleNodeSelectInternal(nodeId, currentMatrix, currentTemporalidad, inDegree, outDegree);
             }
           }
+          // Doble clic fuera no deselecciona explícitamente aquí
         });
 
         // Eliminar el manejador de deselección ya que lo manejamos en el clic
         network.off('deselectNode');
 
+        // Iniciar loop de detección
         detectLoop();
       })
-      .catch(console.error);
+      .catch(error => {
+        console.error('Error inicializando la red:', error);
+      });
 
     // Cleanup function
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      cancelAnimationFrame(animationFrameId);
-      if (hoverTimeout) clearTimeout(hoverTimeout);
-      if (hideTimeout) clearTimeout(hideTimeout);
+      if (networkRef.current) {
+        networkRef.current.destroy();
+      }
       if (tooltipRef.current) {
         document.body.removeChild(tooltipRef.current);
       }
       if (styleEl) {
         document.head.removeChild(styleEl);
       }
-      if (networkRef.current) {
-        networkRef.current.destroy();
-      }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Solo se ejecuta una vez al montar
 
   const handleTargetChange = (target: string) => {
     if (!networkRef.current || !nodesDsRef.current || !edgesDsRef.current || !matrixRef.current || !temporalidadRef.current) return;
 
     setSelectedTarget(target);
     
-    // Obtener todos los nodos y aristas
     const nodes = nodesDsRef.current.get();
     const edges = edgesDsRef.current.get();
     const matrix = matrixRef.current;
 
+    const defaultNodeBackgroundColor = '#78c7c9';
+    const defaultNodeBorderColor = '#00718b';
+    const targetNodeColorValue = '#d51224';
+
+    // Colores personalizados para hover y highlight del nodo filtrado
+    const targetNodeHoverBackgroundColor = '#b2101f';
+    const targetNodeHoverBorderColor = '#b2101f';
+    const targetNodeHighlightBackgroundColor = '#7d0d18';
+    const targetNodeHighlightBorderColor = '#7d0d18';
+
+    // Colores globales de hover y highlight (de options.nodes.color)
+    const globalNodeHoverBackgroundColor = '#3C9CAA';
+    const globalNodeHoverBorderColor = '#00718b';
+    const globalNodeHighlightBackgroundColor = '#00718b';
+    const globalNodeHighlightBorderColor = '#00718b';
+
+    const defaultNodeColorConfig = {
+      background: defaultNodeBackgroundColor,
+      border: defaultNodeBorderColor,
+      hover: {
+        background: globalNodeHoverBackgroundColor,
+        border: globalNodeHoverBorderColor,
+      },
+      highlight: {
+        background: globalNodeHighlightBackgroundColor,
+        border: globalNodeHighlightBorderColor,
+      }
+    };
+
     if (target === 'todos') {
-      // Mostrar todos los nodos y aristas
-      nodesDsRef.current.update(nodes.map(node => ({ ...node, hidden: false })));
+      nodesDsRef.current.update(nodes.map(node => ({
+        ...node,
+        hidden: false,
+        color: defaultNodeColorConfig
+      })));
       edgesDsRef.current.update(edges.map(edge => ({ ...edge, hidden: false })));
     } else {
-      // Encontrar el índice del target seleccionado
       const targetIndex = matrix.columns.indexOf(target);
       
-      // Filtrar nodos y aristas
-      const filteredNodes = nodes.map(node => ({
-        ...node,
-        hidden: node.id !== targetIndex && !matrix.data[node.id as number][targetIndex]
-      }));
+      const filteredNodes = nodes.map(node => {
+        const isTargetNode = node.id === targetIndex;
+        let nodeColorConfig;
+
+        if (isTargetNode) {
+          nodeColorConfig = {
+            background: targetNodeColorValue,
+            border: targetNodeColorValue,
+            hover: {
+              background: targetNodeHoverBackgroundColor,
+              border: targetNodeHoverBorderColor,
+            },
+            highlight: {
+              background: targetNodeHighlightBackgroundColor,
+              border: targetNodeHighlightBorderColor,
+            }
+          };
+        } else {
+          nodeColorConfig = defaultNodeColorConfig;
+        }
+        
+        return {
+          ...node,
+          hidden: node.id !== targetIndex && 
+                  !matrix.data[node.id as number][targetIndex] && 
+                  !matrix.data[targetIndex][node.id as number],
+          color: nodeColorConfig
+        };
+      });
       
       const filteredEdges = edges.map(edge => ({
         ...edge,
@@ -506,10 +745,30 @@ const NetworkMap: React.FC = () => {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <div className="absolute top-4 right-4 flex items-center space-x-2">
+        <button
+          onClick={handleReset}
+          className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
+          title="Restaurar disposición inicial de nodos"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+          <span>Reiniciar</span>
+        </button>
+        <button
+          onClick={handleRandomize}
+          className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
+          title="Reordenar nodos aleatoriamente"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span>Reordenar</span>
+        </button>
         <select
           value={selectedTarget}
           onChange={(e) => handleTargetChange(e.target.value)}
-          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#186170] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[200px]"
+          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#00718b] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[200px]"
         >
           {targets.map((target) => (
             <option key={target} value={target}>
@@ -517,14 +776,6 @@ const NetworkMap: React.FC = () => {
             </option>
           ))}
         </select>
-        <button
-          onClick={handleRandomize}
-          className="bg-[#186170] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#186170]/90 transition-colors duration-200 flex items-center space-x-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
       </div>
       <InfoTable 
         data={selectedNode}
