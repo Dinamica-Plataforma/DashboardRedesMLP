@@ -122,6 +122,7 @@ const NetworkMap: React.FC = () => {
     let lastMousePos = { x: 0, y: 0 };
     let currentEdge: IdType | null = null;
     let animationFrameId: number;
+    // eslint-disable-next-line prefer-const
     let hoverTimeout: NodeJS.Timeout | null = null;
     let hideTimeout: NodeJS.Timeout | null = null;
     let lastEdgeId: IdType | null = null;
@@ -456,6 +457,7 @@ const NetworkMap: React.FC = () => {
         networkRef.current.destroy();
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleTargetChange = (target: string) => {
@@ -467,7 +469,6 @@ const NetworkMap: React.FC = () => {
     const nodes = nodesDsRef.current.get();
     const edges = edgesDsRef.current.get();
     const matrix = matrixRef.current;
-    const temporalidad = temporalidadRef.current;
 
     if (target === 'todos') {
       // Mostrar todos los nodos y aristas

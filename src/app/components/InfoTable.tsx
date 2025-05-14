@@ -28,7 +28,8 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
       setShouldRender(true);
       if (!skipAnimation) {
         // Forzar un reflow para asegurar que la animación funcione
-        document.body.offsetHeight;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _ = document.body.offsetHeight;
         setIsAnimating(true);
       } else {
         setIsAnimating(true);
