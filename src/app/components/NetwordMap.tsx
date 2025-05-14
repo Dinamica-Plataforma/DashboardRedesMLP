@@ -29,7 +29,6 @@ const EASING_FUNCTION = 'easeInOutQuad';
 
 const NetworkMap: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [fixedNodePositions, setFixedNodePositions] = useState<Record<IdType, {x: number, y: number}> | null>(null);
   const initialPositionsRef = useRef<Record<IdType, {x: number, y: number}> | null>(null);
   const networkInitializedRef = useRef(false);
   const physicsEnabledRef = useRef(true);
@@ -242,14 +241,18 @@ const NetworkMap: React.FC = () => {
     // Variables para el tooltip
     let lastMousePos = { x: 0, y: 0 };
     let currentEdge: IdType | null = null;
-    let animationFrameId: number;
-    let hoverTimeout: NodeJS.Timeout | null = null;
+    const hoverTimeout: NodeJS.Timeout | null = null;
     let hideTimeout: NodeJS.Timeout | null = null;
     let lastEdgeId: IdType | null = null;
     let isHovering = false;
+    let animationFrameId: number;
 
     const handleMouseMove = (e: MouseEvent) => {
       lastMousePos = { x: e.clientX, y: e.clientY };
+      if (currentEdge && tooltipRef.current) {
+        tooltipRef.current.style.left = `${e.clientX + 5}px`;
+        tooltipRef.current.style.top = `${e.clientY + 5}px`;
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -372,7 +375,6 @@ const NetworkMap: React.FC = () => {
         // Guardar datos en refs
         matrixRef.current = matrix;
         temporalidadRef.current = temporalidad;
-        setFixedNodePositions(positions);
         initialPositionsRef.current = positions;
 
         // Configurar targets
@@ -530,7 +532,6 @@ const NetworkMap: React.FC = () => {
         // Limitar el movimiento del mapa
         network.on('dragEnd', () => {
           const view = network.getViewPosition();
-          const scale = network.getScale();
           const containerWidth = containerRef.current?.clientWidth || 0;
           const containerHeight = containerRef.current?.clientHeight || 0;
           
@@ -641,6 +642,9 @@ const NetworkMap: React.FC = () => {
       }
       if (styleEl) {
         document.head.removeChild(styleEl);
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
     };
   }, []); // Solo se ejecuta una vez al montar

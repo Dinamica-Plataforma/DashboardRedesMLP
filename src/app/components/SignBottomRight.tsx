@@ -1,5 +1,6 @@
 // components/PoweredBy.tsx
 import React from 'react';
+import Image from 'next/image';
 
 interface PoweredByProps {
   logoSrc: string;
@@ -23,10 +24,12 @@ const PoweredBy: React.FC<PoweredByProps> = ({ logoSrc, signatureText }) => {
       alignItems: 'center',
     }}>
       {signatureText}
-        <img 
+        <Image 
           src={logoSrc} 
           alt="Logo" 
-          style={{ width: '20px', height: '20px', marginLeft: '5px' }} 
+          width={20}
+          height={20}
+          style={{ marginLeft: '5px' }}
         />
     </div>
     </a>
