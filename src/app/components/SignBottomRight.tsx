@@ -14,8 +14,9 @@ const PoweredBy: React.FC<PoweredByProps> = ({ logoSrc, signatureText }) => {
       position: 'fixed',
       bottom: '10px',
       right: '10px',
-      fontStyle: 'italic',
+      /* fontStyle: 'italic', */
       fontSize: '14px',
+      fontWeight: '700',
       color: '#fff',
       backgroundColor: 'rgba(0, 0, 0, 0.4)',
       padding: '3px 8px',

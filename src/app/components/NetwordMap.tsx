@@ -8,10 +8,14 @@ import InfoTable from './InfoTable';
 const MATRIX_PATH = '/data/df_temas_matrix.json';
 const TYPE_PATH = '/data/df_tipo_vinculo.json';
 const TEMPORALIDAD_PATH = '/data/df_temporalidad.json';
+const DESCRIPTIONS_PATH = '/data/df_descriptions.json';
+const DESCRIPTIONS_LT_PATH = '/data/df_descriptions_lt.json';
 
 type Matrix = { columns: string[]; index: string[]; data: (number | null)[][] };
 type TypeMatrix = { data: (string | null)[][] };
 type TemporalidadMatrix = { columns: string[]; index: string[]; data: string[][] };
+type DescriptionsMatrix = { columns: string[]; index: string[]; data: string[][] };
+type DescriptionsLTMatrix = { columns: string[]; index: string[]; data: string[][] };
 
 interface NodeInfo {
   nombre: string;
@@ -20,6 +24,10 @@ interface NodeInfo {
   cb: string;
   evu: string;
   lp: string;
+  descripcion?: string;
+  cb_description?: string;
+  evu_description?: string;
+  lp_description?: string;
 }
 
 // Constantes para el desplazamiento y animación
@@ -32,6 +40,7 @@ const NetworkMap: React.FC = () => {
   const initialPositionsRef = useRef<Record<IdType, {x: number, y: number}> | null>(null);
   const networkInitializedRef = useRef(false);
   const physicsEnabledRef = useRef(true);
+  const descriptionsLTRef = useRef<DescriptionsLTMatrix | null>(null);
 
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
   const selectedNodeRef = useRef(selectedNode);
@@ -45,6 +54,11 @@ const NetworkMap: React.FC = () => {
   const isPanelCausingShiftRef = useRef(isPanelCausingShift);
   useEffect(() => { isPanelCausingShiftRef.current = isPanelCausingShift; }, [isPanelCausingShift]);
 
+  // Estado para mantener el ancho actual del InfoTable
+  const [infoTableWidth, setInfoTableWidth] = useState(INFO_TABLE_EFFECTIVE_WIDTH_PX);
+  const infoTableWidthRef = useRef(infoTableWidth);
+  useEffect(() => { infoTableWidthRef.current = infoTableWidth; }, [infoTableWidth]);
+
   const networkRef = useRef<Network | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const edgesDsRef = useRef<DataSet<Edge> | null>(null);
@@ -53,6 +67,7 @@ const NetworkMap: React.FC = () => {
   const [targets, setTargets] = useState<string[]>([]);
   const temporalidadRef = useRef<TemporalidadMatrix | null>(null);
   const matrixRef = useRef<Matrix | null>(null);
+  const descriptionsRef = useRef<DescriptionsMatrix | null>(null);
 
   const performDeselectActions = (shouldMoveMap: boolean) => {
     if (networkRef.current && shouldMoveMap) {
@@ -83,17 +98,14 @@ const NetworkMap: React.FC = () => {
   const handleNodeSelectInternal = (nodeId: number, matrix: Matrix, temporalidad: TemporalidadMatrix, inDegree: Record<number, number>, outDegree: Record<number, number>) => {
     const nodeIndex = temporalidad.index.indexOf(matrix.columns[nodeId]);
     if (nodeIndex !== -1) {
-      const panelWasVisible = isInfoVisibleRef.current; // Leer de ref
+      const panelWasVisible = isInfoVisibleRef.current;
       const MismoNodoSeleccionado = selectedNodeRef.current?.nombre === matrix.columns[nodeId];
 
-      // Si el panel ya está visible para este nodo, no es necesario hacer mucho, solo asegurarse que esté seleccionado.
-      // La lógica de deselección por clic en mismo nodo está en el manejador de 'click'.
       if (panelWasVisible && MismoNodoSeleccionado) {
-        networkRef.current?.selectNodes([nodeId], false); // Asegurar que el nodo de la librería esté seleccionado
+        networkRef.current?.selectNodes([nodeId], false);
         return;
       }
       
-      // Si el panel estaba visible (para otro nodo), ocultarlo momentáneamente para refrescar contenido.
       if (panelWasVisible && !MismoNodoSeleccionado) {
         setIsInfoVisible(false);
       }
@@ -106,15 +118,17 @@ const NetworkMap: React.FC = () => {
           cb: temporalidad.data[nodeIndex][0],
           evu: temporalidad.data[nodeIndex][1],
           lp: temporalidad.data[nodeIndex][2],
+          descripcion: descriptionsRef.current?.data[nodeIndex]?.[0] || undefined,
+          cb_description: descriptionsLTRef.current?.data[nodeIndex]?.[0] || undefined,
+          evu_description: descriptionsLTRef.current?.data[nodeIndex]?.[1] || undefined,
+          lp_description: descriptionsLTRef.current?.data[nodeIndex]?.[2] || undefined
         };
         setSelectedNode(nodeInfo);
         setIsInfoVisible(true);
 
-        // Mover el mapa si el panel NO estaba visible antes.
         if (networkRef.current && !panelWasVisible) {
           const currentPosition = networkRef.current.getViewPosition();
           const currentScale = networkRef.current.getScale();
-          // Evitar división por cero o escalas extremadamente pequeñas
           const safeScale = Math.max(currentScale, 0.01);
           const shiftInCanvasCoordinates = (INFO_TABLE_EFFECTIVE_WIDTH_PX / 2) / safeScale;
 
@@ -131,9 +145,45 @@ const NetworkMap: React.FC = () => {
   const handleReset = () => {
     if (!networkRef.current || !nodesDsRef.current || !edgesDsRef.current || !initialPositionsRef.current) return;
 
+    // Guardar los nodos seleccionados antes de reiniciar
+    const currentSelectedNodes = networkRef.current.getSelectedNodes();
+
+    // Quitar filtros si están aplicados
+    if (selectedTarget !== 'todos') {
+      setSelectedTarget('todos');
+      
+      // Restaurar todos los nodos y aristas
+      if (nodesDsRef.current && edgesDsRef.current) {
+        const nodes = nodesDsRef.current.get();
+        const edges = edgesDsRef.current.get();
+        
+        nodesDsRef.current.update(nodes.map(node => ({
+          ...node,
+          hidden: false,
+          color: {
+            background: '#78c7c9',
+            border: '#78c7c9',
+            hover: {
+              background: '#3C9CAA',
+              border: '#3C9CAA',
+            },
+            highlight: {
+              background: '#00718b',
+              border: '#00718b',
+            }
+          }
+        })));
+        
+        edgesDsRef.current.update(edges.map(edge => ({
+          ...edge,
+          hidden: false
+        })));
+      }
+    }
+
     // Desactivar la física temporalmente mientras reposicionamos
     networkRef.current.setOptions({ physics: { enabled: false } });
-
+    
     // Obtener las conexiones actuales
     const edges = edgesDsRef.current.get();
 
@@ -161,6 +211,46 @@ const NetworkMap: React.FC = () => {
 
     // Forzar actualización visual
     networkRef.current.redraw();
+
+    // Ajustar el zoom como al inicio
+    networkRef.current.fit({
+      nodes: nodes.map(node => node.id),
+      animation: false
+    });
+    const scale = networkRef.current.getScale() * 0.7;
+    
+    // Verificar si el InfoTable está abierto
+    if (isInfoVisibleRef.current) {
+      // Obtener la posición centrada natural
+      const currentPosition = networkRef.current.getViewPosition();
+      
+      // Usar el ancho actual del InfoTable para calcular el desplazamiento
+      const infoTableOffset = infoTableWidthRef.current;
+      
+      // Desplazar la vista hacia la derecha para compensar el InfoTable
+      networkRef.current.moveTo({
+        position: { 
+          x: currentPosition.x - infoTableOffset,
+          y: currentPosition.y 
+        },
+        scale: scale,
+        animation: {
+          duration: ANIMATION_DURATION,
+          easingFunction: EASING_FUNCTION
+        }
+      });
+    } else {
+      // Si no hay InfoTable, solo aplicamos el zoom
+      networkRef.current.moveTo({
+        scale: scale,
+        animation: false
+      });
+    }
+
+    // Restaurar la selección de nodos si había alguno seleccionado
+    if (currentSelectedNodes.length > 0) {
+      networkRef.current.selectNodes(currentSelectedNodes);
+    }
 
     // Reactivar la física inmediatamente
     networkRef.current.setOptions({
@@ -229,6 +319,17 @@ const NetworkMap: React.FC = () => {
     networkRef.current.setData({
       nodes: nodesDsRef.current,
       edges: edgesDsRef.current
+    });
+
+    // Ajustar el zoom como al inicio
+    networkRef.current.fit({
+      nodes: nodes.map(node => node.id),
+      animation: false
+    });
+    const scale = networkRef.current.getScale() * 0.7;
+    networkRef.current.moveTo({
+      scale: scale,
+      animation: false
     });
 
     networkRef.current.stabilize(100);
@@ -370,15 +471,21 @@ const NetworkMap: React.FC = () => {
       fetch(MATRIX_PATH).then(r => r.json()),
       fetch(TYPE_PATH).then(r => r.json()),
       fetch(TEMPORALIDAD_PATH).then(r => r.json()),
+      fetch(DESCRIPTIONS_PATH).then(r => r.json()),
+      fetch(DESCRIPTIONS_LT_PATH).then(r => r.json()),
     ])
-      .then(([positions, matrix, typeMatrix, temporalidad]: [Record<IdType, {x: number, y: number}> | null, Matrix, TypeMatrix, TemporalidadMatrix]) => {
+      .then(([positions, matrix, typeMatrix, temporalidad, descriptions, descriptionsLT]: [Record<IdType, {x: number, y: number}> | null, Matrix, TypeMatrix, TemporalidadMatrix, DescriptionsMatrix, DescriptionsLTMatrix]) => {
         // Guardar datos en refs
         matrixRef.current = matrix;
         temporalidadRef.current = temporalidad;
+        descriptionsRef.current = descriptions;
+        descriptionsLTRef.current = descriptionsLT;
         initialPositionsRef.current = positions;
 
         // Configurar targets
-        const uniqueTargets = Array.from(new Set(matrix.columns)).sort();
+        const uniqueTargets = Array.from(new Set(matrix.columns)).sort((a, b) => 
+          a.localeCompare(b, undefined, { sensitivity: 'base' })
+        );
         setTargets(['todos', ...uniqueTargets]);
 
         // Preparar edges y calcular grados
@@ -395,15 +502,18 @@ const NetworkMap: React.FC = () => {
               const tipo = typeMatrix.data[i][j] || '-';
               const nivelNum = w;
               const nivelText = nivelNum === 1 ? 'Bajo' : nivelNum === 2 ? 'Medio' : 'Alto';
+              const nivelWeight = nivelNum === 1 ? '400' : nivelNum === 2 ? '600' : '800';
               edges.push({
                 from: i,
                 to: j,
                 color: { color: '#575756', opacity: opacityByLevel[nivelNum] || 1.0 },
                 smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
-                title: `<strong>Desde:</strong> ${matrix.columns[i]}<br/>` +
-                       `<strong>Hasta:</strong> ${matrix.columns[j]}<br/>` +
-                       `<strong>Nivel de vínculo:</strong> ${nivelText}<br/>` +
-                       `<strong>Tipo de vínculo:</strong> ${tipo}`,
+                title: `<div style="color: #575756;">
+                         <strong>Desde:</strong> ${matrix.columns[i]}<br/>
+                         <strong>Hasta:</strong> ${matrix.columns[j]}<br/>
+                         <strong>Nivel de vínculo:</strong> <span style="font-weight: ${nivelWeight};">${nivelText}</span><br/>
+                         <strong>Tipo de vínculo:</strong> ${tipo}
+                       </div>`,
               });
             }
           });
@@ -412,7 +522,7 @@ const NetworkMap: React.FC = () => {
         // Crear nodos
         const nodes: Node[] = matrix.columns.map((label, idx) => {
           const degree = outDegree[idx] || 0;
-          const size = 5 + degree * 4.5;
+          const size = 5 + degree * 3.5;
           const position = positions ? positions[idx.toString() as IdType] : undefined;
           
           return {
@@ -421,7 +531,7 @@ const NetworkMap: React.FC = () => {
             shape: 'dot',
             x: position?.x,
             y: position?.y,
-            color: { background: '#78c7c9', border: '#00718b' },
+            color: { background: '#78c7c9', border: '#78c7c9' },
             size: size,
           };
         });
@@ -437,17 +547,17 @@ const NetworkMap: React.FC = () => {
           nodes: {
             font: {
               size: 20,
-              strokeColor: '#ffffff',
-              strokeWidth: 1.5,
+              strokeColor: '#f4f5f7',
+              strokeWidth: 4,
               multi: true,
               color: '#575756'
             },
             color: {
               background: '#78c7c9',
-              border: '#00718b',
+              border: '#78c7c9',
               hover: {
                 background: '#3C9CAA',
-                border: '#00718b',
+                border: '#3C9CAA',
               },
               highlight: {
                 background: '#00718b',
@@ -465,8 +575,9 @@ const NetworkMap: React.FC = () => {
               inherit: false
             },
             arrows: {
-              to: { enabled: false },
-              middle: {
+              from: { enabled: false },
+              middle: { enabled: false },
+              to: {
                 enabled: true,
                 scaleFactor: 1,
                 type: 'vee'
@@ -507,6 +618,23 @@ const NetworkMap: React.FC = () => {
         // Inicializar red
         const network = new Network(containerRef.current!, { nodes: nodesDs, edges: edgesDs }, options);
         networkRef.current = network;
+
+        // Ajustar la vista inicial con margen
+        network.once('stabilizationIterationsDone', () => {
+          const nodePositions = network.getPositions();
+          // Primero calculamos la escala que necesitamos
+          network.fit({
+            nodes: Object.keys(nodePositions).map(id => parseInt(id)),
+            animation: false
+          });
+          const scale = network.getScale() * 0.7; // Reducimos el zoom un 20% para dar margen
+          
+          // Aplicamos el zoom final directamente
+          network.moveTo({
+            scale: scale,
+            animation: false
+          });
+        });
 
         // Configurar límites de zoom
         let isZooming = false;
@@ -659,7 +787,7 @@ const NetworkMap: React.FC = () => {
     const matrix = matrixRef.current;
 
     const defaultNodeBackgroundColor = '#78c7c9';
-    const defaultNodeBorderColor = '#00718b';
+    const defaultNodeBorderColor = '#78c7c9';
     const targetNodeColorValue = '#d51224';
 
     // Colores personalizados para hover y highlight del nodo filtrado
@@ -670,7 +798,7 @@ const NetworkMap: React.FC = () => {
 
     // Colores globales de hover y highlight (de options.nodes.color)
     const globalNodeHoverBackgroundColor = '#3C9CAA';
-    const globalNodeHoverBorderColor = '#00718b';
+    const globalNodeHoverBorderColor = '#3C9CAA';
     const globalNodeHighlightBackgroundColor = '#00718b';
     const globalNodeHighlightBorderColor = '#00718b';
 
@@ -736,13 +864,55 @@ const NetworkMap: React.FC = () => {
       edgesDsRef.current.update(filteredEdges);
     }
 
-    // Reajustar la vista
+    // Enfoque mejorado para el centrado
+    
+    // 1. Primero, permitir que la red se centre naturalmente en los nodos visibles
+    const visibleNodeIds = nodes
+      .filter(node => !nodesDsRef.current?.get(node.id)?.hidden)
+      .map(node => node.id);
+    
+    if (visibleNodeIds.length === 0) return;
+    
+    // Ajustar el zoom para ver todos los nodos visibles
     networkRef.current.fit({
-      animation: {
-        duration: 500,
-        easingFunction: 'easeInOutQuad'
-      }
+      nodes: visibleNodeIds,
+      animation: false
     });
+    
+    // Obtener la escala deseada
+    const scale = networkRef.current.getScale() * 0.8;
+    
+    // Verificar si el InfoTable está abierto
+    if (isInfoVisibleRef.current) {
+      // En lugar de calcular un centro absoluto, obtenemos la posición actual
+      // y aplicamos un offset para compensar el espacio del InfoTable
+      const currentPosition = networkRef.current.getViewPosition();
+      
+      // Usar el ancho actual del InfoTable para calcular el desplazamiento
+      const infoTableOffset = infoTableWidthRef.current;
+      
+      // Desplazar la vista hacia la derecha para compensar el InfoTable
+      networkRef.current.moveTo({
+        position: { 
+          x: currentPosition.x - infoTableOffset/2,
+          y: currentPosition.y 
+        },
+        scale: scale,
+        animation: {
+          duration: ANIMATION_DURATION,
+          easingFunction: EASING_FUNCTION
+        }
+      });
+    } else {
+      // Si no hay InfoTable, solo aplicamos el zoom
+      networkRef.current.moveTo({
+        scale: scale,
+        animation: {
+          duration: ANIMATION_DURATION,
+          easingFunction: EASING_FUNCTION
+        }
+      });
+    }
   };
 
   return (
@@ -772,7 +942,7 @@ const NetworkMap: React.FC = () => {
         <select
           value={selectedTarget}
           onChange={(e) => handleTargetChange(e.target.value)}
-          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#00718b] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[200px]"
+          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#00718b] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[150px] max-w-[180px]"
         >
           {targets.map((target) => (
             <option key={target} value={target}>
@@ -785,6 +955,8 @@ const NetworkMap: React.FC = () => {
         data={selectedNode}
         isVisible={isInfoVisible}
         onClose={handleNodeDeselect}
+        onFilter={handleTargetChange}
+        onWidthChange={setInfoTableWidth}
       />
     </div>
   );

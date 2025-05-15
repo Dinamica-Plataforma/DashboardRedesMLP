@@ -13,7 +13,7 @@ export default function Header({
 }: HeaderProps) {
   return (
     <header className="top-0 w-full bg-white shadow-lg z-50">
-      <div className="h-[88px] flex items-center">
+      <div className="h-[70px] flex items-center">
         <div className="flex-shrink-0">
           <Link href="https://web.pelambres.cl/">
             <Image
@@ -22,7 +22,7 @@ export default function Header({
               width={300}
               height={107}
               priority
-              className="w-[300px] h-auto"
+              className="w-[250px] h-auto"
             />
           </Link>
         </div>
@@ -30,7 +30,7 @@ export default function Header({
         <div className="h-10 w-px bg-[#575756] mx-4" />
 
         <div>
-            <h1 className="md:text-5xl font-[400] tracking-tighter text-[#00718b]">
+            <h1 className="md:text-4xl font-[400] text-[#00718b]">
             {title}
           </h1>
         </div>
