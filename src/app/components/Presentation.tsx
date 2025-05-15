@@ -51,6 +51,7 @@ const Presentation: React.FC<PresentationProps> = ({
     if (isOpen) {
       setIsVisible(true);
       // Forzar un reflow para asegurar que la animación funcione
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const _ = document.body.offsetHeight;
       setIsAnimating(true);
       

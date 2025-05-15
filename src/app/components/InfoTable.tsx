@@ -26,7 +26,7 @@ interface InfoTableProps {
 }
 
 const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAnimation = false, onFilter, onWidthChange }) => {
-  const { setIsMapInteractionBlocked } = useContext(MapInteractionContext);
+  const { /* setIsMapInteractionBlocked */ } = useContext(MapInteractionContext);
   const [activeTab, setActiveTab] = useState<'general' | 'actores' | 'plan'>('general');
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
