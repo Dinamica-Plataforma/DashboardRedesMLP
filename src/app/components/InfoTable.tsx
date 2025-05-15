@@ -27,13 +27,14 @@ interface InfoTableProps {
 
 const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAnimation = false, onFilter, onWidthChange }) => {
   const { } = useContext(MapInteractionContext);
-  const [activeTab, setActiveTab] = useState<'general' | 'actores' | 'plan'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'actores'>('general');
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
-  const [width, setWidth] = useState(400); // Ancho inicial
+  const [width, setWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
+  const [activeDescription, setActiveDescription] = useState<'cb' | 'evu' | 'lp'>('cb');
   const resizeRef = useRef<HTMLDivElement>(null);
-  const DEFAULT_WIDTH = 400;
+  const DEFAULT_WIDTH = 500;
   const MAX_WIDTH = 800;
 
   const toggleWidth = () => {
@@ -49,7 +50,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
       if (!isResizing) return;
       
       const newWidth = e.clientX;
-      if (newWidth >= 300 && newWidth <= 800) {
+      if (newWidth >= DEFAULT_WIDTH && newWidth <= MAX_WIDTH) {
         setWidth(newWidth);
         if (onWidthChange) {
           onWidthChange(newWidth);
@@ -104,6 +105,36 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
 
   if (!shouldRender) return null;
 
+  // Función para obtener la descripción activa
+  const getActiveDescription = () => {
+    if (!data) return null;
+    
+    switch (activeDescription) {
+      case 'cb':
+        return {
+          title: 'Caso Base',
+          value: data.cb,
+          description: data.cb_description
+        };
+      case 'evu':
+        return {
+          title: 'EVU',
+          value: data.evu,
+          description: data.evu_description
+        };
+      case 'lp':
+        return {
+          title: 'Largo Plazo',
+          value: data.lp,
+          description: data.lp_description
+        };
+      default:
+        return null;
+    }
+  };
+
+  const activeDescriptionData = getActiveDescription();
+
   return (
     <>
       <div 
@@ -114,19 +145,20 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
             : '-translate-x-full opacity-0'}`}
         style={{
           width: `${width}px`,
-          minWidth: '300px',
-          maxWidth: '800px',
+          minWidth: `${DEFAULT_WIDTH}px`,
+          maxWidth: `${MAX_WIDTH}px`,
           willChange: 'transform, opacity',
           transform: isAnimating ? 'translateX(0)' : 'translateX(-100%)',
           opacity: isAnimating ? 1 : 0,
           zIndex: 48,
           pointerEvents: 'auto',
+          height: '100%'
         }}
       >
         {/* Encabezado con título y botón cerrar */}
-        <div className="sticky top-0 bg-white/95 backdrop-blur-sm p-6 pb-4 border-b border-gray-200 flex justify-between items-start">
+        <div className="sticky top-0 bg-white/95 backdrop-blur-sm p-6 pb-4 border-b border-gray-200 flex justify-between items-start h-[80px]">
           <h2 className="text-[20px] font-[700] text-[#00718b] whitespace-normal break-words pr-8">
-            {data?.nombre}
+            {data?.nombre || "Sin nombre"}
           </h2>
           <button onClick={onClose} aria-label="Cerrar" className="p-2 ml-2 rounded-full hover:bg-gray-100 transition">
             <svg className="w-5 h-5 text-[#00718b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,9 +168,9 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
         </div>
 
         {/* Contenido principal con scroll */}
-        <div className="flex-1 overflow-hidden flex flex-col px-6">
+        <div className="flex-1 overflow-hidden flex flex-col px-6 py-3" style={{ height: 'calc(100% - 80px - 72px)' }}>
           {/* Botones de categoría */}
-          <div className="flex w-full my-6">
+          <div className="flex w-full mb-4 h-[40px]">
             <button
               onClick={() => setActiveTab('general')}
               className={`flex-1 px-3 py-1.5 rounded-l-lg text-[14px] font-[600] transition-all duration-200
@@ -151,7 +183,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
             </button>
             <button
               onClick={() => setActiveTab('actores')}
-              className={`flex-1 px-3 py-1.5 text-[14px] font-[600] transition-all duration-200
+              className={`flex-1 px-3 py-1.5 rounded-r-lg text-[14px] font-[600] transition-all duration-200
                 ${activeTab === 'actores'
                   ? 'bg-[#00718b] text-white shadow-md'
                   : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
@@ -159,152 +191,139 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
             >
               Actores
             </button>
-            <button
-              onClick={() => setActiveTab('plan')}
-              className={`flex-1 px-3 py-1.5 rounded-r-lg text-[14px] font-[600] transition-all duration-200
-                ${activeTab === 'plan'
-                  ? 'bg-[#00718b] text-white shadow-md'
-                  : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
-                }`}
-            >
-              Plan de acción
-            </button>
           </div>
 
           {/* Contenido de la pestaña activa */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {activeTab === 'general' && data && (
-              <div className="h-full flex flex-col gap-3 overflow-hidden">
-                {/* Descripción con scroll propio */}
-                {data.descripcion && (
-                  <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col">
-                    <div className="text-[14px] font-[600] text-[#00718b] mb-2 text-left">Descripción</div>
-                    <div className="overflow-y-auto max-h-[150px] scrollbar-custom">
-                      <div className="pr-4">
-                        <p className="text-[13px] text-[#575756] whitespace-pre-wrap text-justify hyphens-auto"
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {activeTab === 'general' ? (
+              <>
+                {/* Descripción general - Ocupa el espacio flexible disponible */}
+                <div className="flex-1 bg-gray-50 rounded-lg p-4 shadow-sm transition-shadow duration-200 flex flex-col mb-4 min-h-[80px] overflow-hidden">
+                  <div className="text-[14px] font-[600] text-[#00718b] mb-2 text-left">Descripción</div>
+                  <div className="overflow-y-auto flex-1 scrollbar-custom">
+                    <div className="pr-4">
+                      {data?.descripcion ? (
+                        <p className="text-[13px] text-[#575756] whitespace-pre-wrap text-left"
                            style={{ 
-                             WebkitHyphens: 'auto',
-                             msHyphens: 'auto',
-                             hyphens: 'auto',
-                             textJustify: 'inter-word'
+                             WebkitHyphens: 'none',
+                             msHyphens: 'none',
+                             hyphens: 'none'
                            }}
                         >{data.descripcion}</p>
-                      </div>
+                      ) : (
+                        <p className="text-[13px] text-gray-500 italic">Sin descripción disponible.</p>
+                      )}
                     </div>
-                  </div>
-                )}
-
-                {/* Conexiones en una fila */}
-                <div className="grid grid-cols-2 gap-3 flex-none">
-                  <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-                    <div className="text-[15px] font-[600] text-[#00718b] mb-1">Conexiones Entrantes</div>
-                    <div className="text-[16px] font-[600] text-[#575756]">{data.conexionesEntrantes}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-                    <div className="text-[15px] font-[600] text-[#00718b] mb-1">Conexiones Salientes</div>
-                    <div className="text-[16px] font-[600] text-[#575756]">{data.conexionesSalientes}</div>
                   </div>
                 </div>
 
-                {/* Estados con scroll individual */}
-                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-custom pr-4">
-                  <div className="grid grid-cols-1 gap-3">
-                    <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="flex min-h-[80px]">
-                        <div className="w-[100px] min-w-[100px] flex flex-col items-center justify-center border-r border-gray-200 pr-4">
-                          <div className="text-[14px] font-[600] text-[#00718b]">Caso Base</div>
+                {/* Sección inferior con tamaño automático */}
+                <div className="flex-shrink-0">
+                  {/* Conexiones en una fila - Altura automática */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-gray-50 rounded-lg p-3 shadow-sm transition-shadow duration-200 text-center">
+                      <div className="text-[15px] font-[600] text-[#00718b] mb-1">Conexiones Entrantes</div>
+                      <div className="text-[20px] font-[600] text-[#575756]">{data?.conexionesEntrantes || 0}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3 shadow-sm transition-shadow duration-200 text-center">
+                      <div className="text-[15px] font-[600] text-[#00718b] mb-1">Conexiones Salientes</div>
+                      <div className="text-[20px] font-[600] text-[#575756]">{data?.conexionesSalientes || 0}</div>
+                    </div>
+                  </div>
+
+                  {/* Selector y descripción con divs de altura fija */}
+                  <div className="flex">
+                    {/* Columna izquierda - Selectores */}
+                    <div className="w-1/3 pr-2">
+                      <div className="flex flex-col gap-2">
+                        <div 
+                          className={`p-3 rounded-lg cursor-pointer transition-all duration-200
+                            ${activeDescription === 'cb' 
+                              ? 'bg-[#00718b] text-white font-medium' 
+                              : 'bg-gray-50 hover:bg-gray-100'}`}
+                          onClick={() => setActiveDescription('cb')}
+                        >
+                          <div className={`text-[14px] font-[600] ${activeDescription === 'cb' ? 'text-white' : 'text-[#00718b]'}`}>
+                            Caso Base
+                          </div>
                           <div className={`text-[15px] mt-1 ${
-                            data.cb?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
-                            data.cb?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
-                            data.cb?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
-                            'font-medium'
-                          } text-[#575756]`}>
-                            {data.cb}
+                            activeDescription === 'cb' ? 'text-white' :
+                            data?.cb?.toLowerCase().trim() === 'bajo' ? 'font-[400] text-[#575756]' :
+                            data?.cb?.toLowerCase().trim() === 'medio' ? 'font-[600] text-[#575756]' :
+                            data?.cb?.toLowerCase().trim() === 'alto' ? 'font-[800] text-[#575756]' :
+                            'font-medium text-[#575756]'
+                          }`}>
+                            {data?.cb || "N/A"}
                           </div>
                         </div>
-                        <div className="flex-1 pl-4 overflow-y-auto scrollbar-custom">
-                          <div className="pr-4">
-                            {data.cb_description ? (
-                              <p className="text-[13px] text-[#575756] text-justify leading-relaxed"
-                                 style={{ 
-                                   WebkitHyphens: 'auto',
-                                   msHyphens: 'auto',
-                                   hyphens: 'auto',
-                                   wordSpacing: 'normal',
-                                   textAlignLast: 'left'
-                                 }}>
-                                {data.cb_description}
-                              </p>
-                            ) : (
-                              <p className="text-[13px] text-gray-500 italic">Sin información.</p>
-                            )}
+                        
+                        <div 
+                          className={`p-3 rounded-lg cursor-pointer transition-all duration-200
+                            ${activeDescription === 'evu' 
+                              ? 'bg-[#00718b] text-white font-medium' 
+                              : 'bg-gray-50 hover:bg-gray-100'}`}
+                          onClick={() => setActiveDescription('evu')}
+                        >
+                          <div className={`text-[14px] font-[600] ${activeDescription === 'evu' ? 'text-white' : 'text-[#00718b]'}`}>
+                            EVU
+                          </div>
+                          <div className={`text-[15px] mt-1 ${
+                            activeDescription === 'evu' ? 'text-white' :
+                            data?.evu?.toLowerCase().trim() === 'bajo' ? 'font-[400] text-[#575756]' :
+                            data?.evu?.toLowerCase().trim() === 'medio' ? 'font-[600] text-[#575756]' :
+                            data?.evu?.toLowerCase().trim() === 'alto' ? 'font-[800] text-[#575756]' :
+                            'font-medium text-[#575756]'
+                          }`}>
+                            {data?.evu || "N/A"}
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`p-3 rounded-lg cursor-pointer transition-all duration-200
+                            ${activeDescription === 'lp' 
+                              ? 'bg-[#00718b] text-white font-medium' 
+                              : 'bg-gray-50 hover:bg-gray-100'}`}
+                          onClick={() => setActiveDescription('lp')}
+                        >
+                          <div className={`text-[14px] font-[600] ${activeDescription === 'lp' ? 'text-white' : 'text-[#00718b]'}`}>
+                            Largo Plazo
+                          </div>
+                          <div className={`text-[15px] mt-1 ${
+                            activeDescription === 'lp' ? 'text-white' :
+                            data?.lp?.toLowerCase().trim() === 'bajo' ? 'font-[400] text-[#575756]' :
+                            data?.lp?.toLowerCase().trim() === 'medio' ? 'font-[600] text-[#575756]' :
+                            data?.lp?.toLowerCase().trim() === 'alto' ? 'font-[800] text-[#575756]' :
+                            'font-medium text-[#575756]'
+                          }`}>
+                            {data?.lp || "N/A"}
                           </div>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="flex min-h-[80px]">
-                        <div className="w-[100px] min-w-[100px] flex flex-col items-center justify-center border-r border-gray-200 pr-4">
-                          <div className="text-[14px] font-[600] text-[#00718b]">EVU</div>
-                          <div className={`text-[15px] mt-1 ${
-                            data.evu?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
-                            data.evu?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
-                            data.evu?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
-                            'font-medium'
-                          } text-[#575756]`}>
-                            {data.evu}
-                          </div>
-                        </div>
-                        <div className="flex-1 pl-4 overflow-y-auto scrollbar-custom">
-                          <div className="pr-4">
-                            {data.evu_description ? (
-                              <p className="text-[13px] text-[#575756] text-justify leading-relaxed"
-                                 style={{ 
-                                   WebkitHyphens: 'auto',
-                                   msHyphens: 'auto',
-                                   hyphens: 'auto',
-                                   wordSpacing: 'normal',
-                                   textAlignLast: 'left'
-                                 }}>
-                                {data.evu_description}
-                              </p>
-                            ) : (
-                              <p className="text-[13px] text-gray-500 italic">Sin información.</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Línea divisoria */}
+                    <div className="border-r border-gray-200 mx-1 h-auto"></div>
                     
-                    <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="flex min-h-[80px]">
-                        <div className="w-[100px] min-w-[100px] flex flex-col items-center justify-center border-r border-gray-200 pr-4">
-                          <div className="text-[14px] font-[600] text-[#00718b] text-center w-full">Largo Plazo</div>
-                          <div className={`text-[15px] mt-1 ${
-                            data.lp?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
-                            data.lp?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
-                            data.lp?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
-                            'font-medium'
-                          } text-[#575756]`}>
-                            {data.lp}
-                          </div>
+                    {/* Columna derecha - Descripción */}
+                    <div className="w-2/3 pl-2">
+                      <div className="bg-gray-50 p-4 rounded-lg h-[230px] flex flex-col">
+                        <div className="text-[14px] font-[700] text-[#00718b] mb-2 flex-shrink-0">
+                          {activeDescriptionData?.title || "Sin datos"}
                         </div>
-                        <div className="flex-1 pl-4 overflow-y-auto scrollbar-custom">
+                        <div className="overflow-y-auto flex-1 scrollbar-custom">
                           <div className="pr-4">
-                            {data.lp_description ? (
-                              <p className="text-[13px] text-[#575756] text-justify leading-relaxed"
-                                 style={{ 
-                                   WebkitHyphens: 'auto',
-                                   msHyphens: 'auto',
-                                   hyphens: 'auto',
-                                   wordSpacing: 'normal',
-                                   textAlignLast: 'left'
-                                 }}>
-                                {data.lp_description}
+                            {activeDescriptionData?.description ? (
+                              <p className="text-[13px] text-[#575756] text-left leading-relaxed"
+                                style={{ 
+                                  WebkitHyphens: 'none',
+                                  msHyphens: 'none',
+                                  hyphens: 'none',
+                                  wordSpacing: 'normal'
+                                }}>
+                                {activeDescriptionData.description}
                               </p>
                             ) : (
-                              <p className="text-[13px] text-gray-500 italic">Sin información.</p>
+                              <p className="text-[13px] text-gray-500 italic">Sin información para {activeDescriptionData?.title || "este elemento"}.</p>
                             )}
                           </div>
                         </div>
@@ -312,25 +331,20 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {activeTab === 'actores' && (
-              <div className="text-center text-gray-500 py-8">
-                Información de actores no disponible aún
-              </div>
-            )}
-
-            {activeTab === 'plan' && (
-              <div className="text-center text-gray-500 py-8">
-                Plan de acción no disponible aún
+              </>
+            ) : (
+              // Contenido de la pestaña "Actores"
+              <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-lg">
+                <div className="text-center text-gray-500 py-8">
+                  Información de actores no disponible aún
+                </div>
               </div>
             )}
           </div>
         </div>
 
         {/* Botón al final */}
-        <div className="p-4 border-t border-gray-200 bg-white/95 backdrop-blur-sm">
+        <div className="p-4 border-t border-gray-200 bg-white/95 backdrop-blur-sm h-[72px]">
           <button
             onClick={() => {
               if (data?.nombre && onFilter) {
@@ -338,11 +352,12 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
               }
             }}
             className="w-full bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center justify-center space-x-2"
+            disabled={!data?.nombre}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
-            <span className="text-[13px]">Zoom conexiones</span>
+            <span className="text-[13px]">Zoom conexiones {data?.nombre ? (data.nombre.length > 30 ? data.nombre.substring(0, 30) + "..." : data.nombre) : ""}</span>
           </button>
         </div>
       </div>

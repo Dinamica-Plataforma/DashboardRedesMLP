@@ -17,8 +17,8 @@ interface PresentationProps {
 const Presentation: React.FC<PresentationProps> = ({
   isOpen = true,
   onClose,
-  title = "Dashboard Redes MLP",
-  description = "Bienvenido al Dashboard de Redes de Minera Los Pelambres, desarrollado por Dinámica Plataforma. Esta herramienta le permite visualizar y analizar de forma interactiva las conexiones y relaciones entre los distintos temas críticos de la red.\n\nFuncionalidades principales:\n• Visualización gráfica de relaciones entre temas críticos\n• Filtrado y búsqueda de conexiones específicas por temas críticos\n• Información detallada de cada tema crítico y sus interacciones\n• Vista general del mapa de redes de temas críticos\n\nPara comenzar, explore el mapa haciendo clic en los nodos para desplegar la información, y navegue por los distintos menús que ofrece la plataforma.",
+  title = "Modelo Relacional Pelambres Futuro",
+  description = "Bienvenido al Modelo Relacional Pelambres Futuro de Minera Los Pelambres, desarrollado por Dinámica Plataforma. Esta herramienta le permite visualizar y analizar de forma interactiva las conexiones y relaciones entre los distintos temas críticos de la red.\n\nFuncionalidades principales:\n• Visualización gráfica de relaciones entre temas críticos\n• Filtrado y búsqueda de conexiones específicas por temas críticos\n• Información detallada de cada tema crítico y sus interacciones\n• Vista general del mapa de redes de temas críticos\n\nPara comenzar, explore el mapa haciendo clic en los nodos para desplegar la información, y navegue por los distintos menús que ofrece la plataforma.",
   imageSrc = "/images/demo.png",
   developerLogoSrc = "/images/logo_dp_blue.svg"
 }) => {

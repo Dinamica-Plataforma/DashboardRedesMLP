@@ -26,7 +26,7 @@ export default function Home() {
     <MapInteractionContext.Provider value={{ isMapInteractionBlocked, setIsMapInteractionBlocked }}>
       <main className="h-screen flex flex-col">
         <div>
-          <Header title="Dashboard Redes MLP" logoSrc="/images/logo_mlp.svg"/>
+          <Header title="Modelo Relacional Pelambres Futuro" logoSrc="/images/logo_mlp.svg"/>
         </div>
         <NetwordMap />
         

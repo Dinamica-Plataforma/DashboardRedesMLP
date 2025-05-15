@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
 import { DataSet, Network, Node, Edge, Options, IdType } from 'vis-network/standalone';
 import InfoTable from './InfoTable';
+import Leyend from './Leyend';
 import { MapInteractionContext } from '../context/MapInteractionContext';
 
 // Rutas a los JSON en public/data
@@ -32,7 +33,7 @@ interface NodeInfo {
 }
 
 // Constantes para el desplazamiento y animación
-const INFO_TABLE_EFFECTIVE_WIDTH_PX = 300; // Ancho estimado en píxeles del InfoTable
+const INFO_TABLE_EFFECTIVE_WIDTH_PX = 500; // Actualizado de 300 a 500 para coincidir con el nuevo ancho del InfoTable
 const ANIMATION_DURATION = 300;
 const EASING_FUNCTION = 'easeInOutQuad';
 
@@ -104,6 +105,22 @@ const NetworkMap: React.FC = () => {
   };
   
   const handleNodeDeselect = () => { // Usada por InfoTable onClose
+    if (selectedNode && nodesDsRef.current && matrixRef.current) {
+      // Buscar el índice del nodo seleccionado antes de deseleccionarlo
+      const nodeIndex = matrixRef.current.columns.indexOf(selectedNode.nombre);
+      if (nodeIndex !== -1) {
+        // Actualizar el nodo para restaurar su tamaño original
+        nodesDsRef.current.update({
+          id: nodeIndex,
+          font: {
+            size: 20, // Tamaño original
+            strokeColor: '#f4f5f7',
+            strokeWidth: 4,
+          },
+          widthConstraint: { maximum: 250 } // Ancho original
+        });
+      }
+    }
     performDeselectActions(isPanelCausingShift); // Accede al estado isPanelCausingShift directamente
   };
 
@@ -160,6 +177,7 @@ const NetworkMap: React.FC = () => {
 
     // Guardar los nodos seleccionados antes de reiniciar
     const currentSelectedNodes = networkRef.current.getSelectedNodes();
+    const currentlySelectedNodeId = currentSelectedNodes.length > 0 ? currentSelectedNodes[0] as number : null;
 
     // Quitar filtros si están aplicados
     if (selectedTarget !== 'todos') {
@@ -170,22 +188,32 @@ const NetworkMap: React.FC = () => {
         const nodes = nodesDsRef.current.get();
         const edges = edgesDsRef.current.get();
         
-        nodesDsRef.current.update(nodes.map(node => ({
-          ...node,
-          hidden: false,
-          color: {
-            background: '#78c7c9',
-            border: '#78c7c9',
-            hover: {
-              background: '#3C9CAA',
-              border: '#3C9CAA',
+        nodesDsRef.current.update(nodes.map(node => {
+          const isSelected = currentlySelectedNodeId === node.id;
+          
+          return {
+            ...node,
+            hidden: false,
+            color: {
+              background: '#78c7c9',
+              border: '#78c7c9',
+              hover: {
+                background: '#3C9CAA',
+                border: '#3C9CAA',
+              },
+              highlight: {
+                background: '#00718b',
+                border: '#00718b',
+              }
             },
-            highlight: {
-              background: '#00718b',
-              border: '#00718b',
-            }
-          }
-        })));
+            font: {
+              size: isSelected ? 25 : 20,
+              strokeColor: '#f4f5f7',
+              strokeWidth: 4,
+            },
+            widthConstraint: { maximum: isSelected ? 310 : 250 }
+          };
+        }));
         
         edgesDsRef.current.update(edges.map(edge => ({
           ...edge,
@@ -202,11 +230,21 @@ const NetworkMap: React.FC = () => {
 
     // Actualizar posiciones de nodos
     const nodes = nodesDsRef.current.get();
-    const updatedNodes = nodes.map(node => ({
-      ...node,
-      x: initialPositionsRef.current?.[node.id as IdType]?.x,
-      y: initialPositionsRef.current?.[node.id as IdType]?.y
-    }));
+    const updatedNodes = nodes.map(node => {
+      const isSelected = currentlySelectedNodeId === node.id;
+      
+      return {
+        ...node,
+        x: initialPositionsRef.current?.[node.id as IdType]?.x,
+        y: initialPositionsRef.current?.[node.id as IdType]?.y,
+        font: {
+          size: isSelected ? 25 : 20,
+          strokeColor: '#f4f5f7',
+          strokeWidth: 4,
+        },
+        widthConstraint: { maximum: isSelected ? 310 : 250 }
+      };
+    });
 
     // Limpiar el DataSet completamente
     nodesDsRef.current.clear();
@@ -290,6 +328,10 @@ const NetworkMap: React.FC = () => {
   const handleRandomize = () => {
     if (!networkRef.current || !nodesDsRef.current || !edgesDsRef.current) return;
 
+    // Guardar los nodos seleccionados antes de reiniciar
+    const currentSelectedNodes = networkRef.current.getSelectedNodes();
+    const currentlySelectedNodeId = currentSelectedNodes.length > 0 ? currentSelectedNodes[0] as number : null;
+
     // Activar la física
     networkRef.current.setOptions({
       physics: {
@@ -316,11 +358,21 @@ const NetworkMap: React.FC = () => {
 
     // Generar nuevas posiciones aleatorias
     const nodes = nodesDsRef.current.get();
-    const randomizedNodes = nodes.map(node => ({
-      ...node,
-      x: Math.random() * 1000 - 500,
-      y: Math.random() * 1000 - 500
-    }));
+    const randomizedNodes = nodes.map(node => {
+      const isSelected = currentlySelectedNodeId === node.id;
+      
+      return {
+        ...node,
+        x: Math.random() * 1000 - 500,
+        y: Math.random() * 1000 - 500,
+        font: {
+          size: isSelected ? 25 : 20,
+          strokeColor: '#f4f5f7',
+          strokeWidth: 4,
+        },
+        widthConstraint: { maximum: isSelected ? 310 : 250 }
+      };
+    });
 
     // Limpiar y recargar los datos
     nodesDsRef.current.clear();
@@ -346,6 +398,11 @@ const NetworkMap: React.FC = () => {
     });
 
     networkRef.current.stabilize(100);
+    
+    // Restaurar la selección de nodos si había alguno seleccionado
+    if (currentSelectedNodes.length > 0) {
+      networkRef.current.selectNodes(currentSelectedNodes);
+    }
   };
 
   useEffect(() => {
@@ -546,10 +603,12 @@ const NetworkMap: React.FC = () => {
                 color: { color: '#575756', opacity: opacityByLevel[nivelNum] || 1.0 },
                 smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
                 title: `<div style="color: #575756;">
+                         <div style="font-size: 14px; margin-bottom: 8px; color: #00718b;">
+                           <strong>Relevancia del vínculo:</strong> <span style="font-weight: ${nivelWeight};">${nivelText}</span>
+                         </div>
                          <strong>Desde:</strong> ${matrix.columns[i]}<br/>
                          <strong>Hasta:</strong> ${matrix.columns[j]}<br/>
-                         <strong>Nivel de vínculo:</strong> <span style="font-weight: ${nivelWeight};">${nivelText}</span><br/>
-                         <strong>Tipo de vínculo:</strong> ${tipo}
+                         <strong>Descirpción:</strong> ${tipo}
                        </div>`,
               });
             }
@@ -620,7 +679,7 @@ const NetworkMap: React.FC = () => {
                 type: 'vee'
               }
             },
-            width: 2,
+            width: 4,
             hoverWidth: 0,
             selectionWidth: 0
           },
@@ -744,6 +803,87 @@ const NetworkMap: React.FC = () => {
           }
         });
 
+        // Añadir evento para cambiar el tamaño de la fuente en hover
+        network.on('hoverNode', (params) => {
+          if (isMapInteractionBlockedRef.current) return;
+          
+          const nodeId = params.node;
+          const node = nodesDs.get(nodeId);
+          
+          if (node) {
+            nodesDs.update({
+              id: nodeId,
+              font: {
+                size: 25, // Aumentar el tamaño a 25px
+                strokeColor: '#f4f5f7',
+                strokeWidth: 4,
+              },
+              widthConstraint: { maximum: 310 } // Aumentar el ancho proporcionalmente
+            });
+          }
+        });
+
+        network.on('blurNode', (params) => {
+          if (isMapInteractionBlockedRef.current) return;
+          
+          const nodeId = params.node;
+          const node = nodesDs.get(nodeId);
+          
+          if (node) {
+            // Restaurar al tamaño original si no está seleccionado
+            const isSelected = network.getSelectedNodes().includes(nodeId);
+            if (!isSelected) {
+              nodesDs.update({
+                id: nodeId,
+                font: {
+                  size: 20, // Tamaño original
+                  strokeColor: '#f4f5f7',
+                  strokeWidth: 4,
+                },
+                widthConstraint: { maximum: 250 } // Ancho original
+              });
+            }
+          }
+        });
+
+        // También actualizar el tamaño al seleccionar nodos
+        network.on('selectNode', (params) => {
+          if (isMapInteractionBlockedRef.current) return;
+          
+          const nodeId = params.nodes[0];
+          const node = nodesDs.get(nodeId);
+          
+          if (node) {
+            nodesDs.update({
+              id: nodeId,
+              font: {
+                size: 25, // Aumentar el tamaño a 25px
+                strokeColor: '#f4f5f7',
+                strokeWidth: 4,
+              },
+              widthConstraint: { maximum: 310 } // Aumentar el ancho proporcionalmente
+            });
+          }
+        });
+
+        // Restaurar tamaño para nodos previamente seleccionados
+        const handleCustomDeselectNode = (previouslySelectedNodeId: IdType) => {
+          if (isMapInteractionBlockedRef.current) return;
+          
+          const node = nodesDs.get(previouslySelectedNodeId);
+          if (node) {
+            nodesDs.update({
+              id: previouslySelectedNodeId,
+              font: {
+                size: 20, // Tamaño original
+                strokeColor: '#f4f5f7',
+                strokeWidth: 4,
+              },
+              widthConstraint: { maximum: 250 } // Ancho original
+            });
+          }
+        };
+
         // Configurar eventos de la red
         network.on('click', (params) => {
           const currentMatrix = matrixRef.current;
@@ -758,12 +898,29 @@ const NetworkMap: React.FC = () => {
             // Usar selectedNodeRef para obtener el estado actual del nodo seleccionado
             if (selectedNodeRef.current && selectedNodeRef.current.nombre === currentMatrix.columns[nodeId]) {
               // Clic en el mismo nodo seleccionado -> deseleccionar
+              const previouslySelectedNodeId = nodeId;
               performDeselectActions(isPanelCausingShiftRef.current); // Usa el valor del ref
+              // Restaurar el tamaño de fuente del nodo deseleccionado
+              handleCustomDeselectNode(previouslySelectedNodeId);
             } else {
+              // Si había un nodo seleccionado previamente, restauramos su tamaño
+              if (selectedNodeRef.current) {
+                const prevNodeIndex = currentMatrix.columns.indexOf(selectedNodeRef.current.nombre);
+                if (prevNodeIndex !== -1) {
+                  handleCustomDeselectNode(prevNodeIndex);
+                }
+              }
               // Clic en un nodo diferente (o ningún nodo seleccionado previamente) -> seleccionar
               handleNodeSelectInternal(nodeId, currentMatrix, currentTemporalidad, inDegree, outDegree);
             }
           } else {
+            // Si había un nodo seleccionado, restauramos su tamaño
+            if (selectedNodeRef.current) {
+              const prevNodeIndex = currentMatrix.columns.indexOf(selectedNodeRef.current.nombre);
+              if (prevNodeIndex !== -1) {
+                handleCustomDeselectNode(prevNodeIndex);
+              }
+            }
             // Clic fuera de cualquier nodo -> deseleccionar
             performDeselectActions(isPanelCausingShiftRef.current); // Usa el valor del ref
           }
@@ -778,8 +935,18 @@ const NetworkMap: React.FC = () => {
             const nodeId = params.nodes[0] as number;
             if (selectedNodeRef.current && selectedNodeRef.current.nombre === currentMatrix.columns[nodeId]) {
               // Doble clic en el mismo nodo -> deseleccionar
+              const previouslySelectedNodeId = nodeId;
               performDeselectActions(isPanelCausingShiftRef.current); // Usa el valor del ref
+              // Restaurar el tamaño de fuente del nodo deseleccionado
+              handleCustomDeselectNode(previouslySelectedNodeId);
             } else {
+              // Si había un nodo seleccionado previamente, restauramos su tamaño
+              if (selectedNodeRef.current) {
+                const prevNodeIndex = currentMatrix.columns.indexOf(selectedNodeRef.current.nombre);
+                if (prevNodeIndex !== -1) {
+                  handleCustomDeselectNode(prevNodeIndex);
+                }
+              }
               // Doble clic en un nodo diferente -> seleccionar
               handleNodeSelectInternal(nodeId, currentMatrix, currentTemporalidad, inDegree, outDegree);
             }
@@ -787,7 +954,7 @@ const NetworkMap: React.FC = () => {
           // Doble clic fuera no deselecciona explícitamente aquí
         });
 
-        // Eliminar el manejador de deselección ya que lo manejamos en el clic
+        // No necesitamos el evento de deselección predeterminado, lo manejamos personalizadamente
         network.off('deselectNode');
 
         // Iniciar loop de detección
@@ -862,18 +1029,34 @@ const NetworkMap: React.FC = () => {
       }
     };
 
+    // Obtener el nodo seleccionado actualmente para mantener su estado especial
+    const selectedNodes = networkRef.current.getSelectedNodes();
+    const currentlySelectedNodeId = selectedNodes.length > 0 ? selectedNodes[0] as number : null;
+
     if (target === 'todos') {
-      nodesDsRef.current.update(nodes.map(node => ({
-        ...node,
-        hidden: false,
-        color: defaultNodeColorConfig
-      })));
+      nodesDsRef.current.update(nodes.map(node => {
+        // Si este nodo está seleccionado, mantener el tamaño de fuente grande
+        const isSelected = currentlySelectedNodeId === node.id;
+        
+        return {
+          ...node,
+          hidden: false,
+          color: defaultNodeColorConfig,
+          font: {
+            size: isSelected ? 25 : 20,
+            strokeColor: '#f4f5f7',
+            strokeWidth: 4,
+          },
+          widthConstraint: { maximum: isSelected ? 310 : 250 }
+        };
+      }));
       edgesDsRef.current.update(edges.map(edge => ({ ...edge, hidden: false })));
     } else {
       const targetIndex = matrix.columns.indexOf(target);
       
       const filteredNodes = nodes.map(node => {
         const isTargetNode = node.id === targetIndex;
+        const isSelected = currentlySelectedNodeId === node.id;
         let nodeColorConfig;
 
         if (isTargetNode) {
@@ -893,12 +1076,20 @@ const NetworkMap: React.FC = () => {
           nodeColorConfig = defaultNodeColorConfig;
         }
         
+        const visible = node.id === targetIndex || 
+                      matrix.data[node.id as number][targetIndex] || 
+                      matrix.data[targetIndex][node.id as number];
+        
         return {
           ...node,
-          hidden: node.id !== targetIndex && 
-                  !matrix.data[node.id as number][targetIndex] && 
-                  !matrix.data[targetIndex][node.id as number],
-          color: nodeColorConfig
+          hidden: !visible,
+          color: nodeColorConfig,
+          font: {
+            size: isSelected ? 25 : 20,
+            strokeColor: '#f4f5f7',
+            strokeWidth: 4,
+          },
+          widthConstraint: { maximum: isSelected ? 310 : 250 }
         };
       });
       
@@ -965,41 +1156,45 @@ const NetworkMap: React.FC = () => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      <div className="absolute top-4 right-4 flex items-center space-x-2">
-        <button
-          onClick={handleReset}
-          className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
-          title="Restaurar disposición inicial de nodos"
-          disabled={isMapInteractionBlocked}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-          </svg>
-          <span>Reiniciar</span>
-        </button>
-        <button
-          onClick={handleRandomize}
-          className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
-          title="Reordenar nodos aleatoriamente"
-          disabled={isMapInteractionBlocked}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <span>Reordenar</span>
-        </button>
-        <select
-          value={selectedTarget}
-          onChange={(e) => handleTargetChange(e.target.value)}
-          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#00718b] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[150px] max-w-[180px]"
-          disabled={isMapInteractionBlocked}
-        >
-          {targets.map((target) => (
-            <option key={target} value={target}>
-              {target === 'todos' ? 'Todos los tópicos' : target}
-            </option>
-          ))}
-        </select>
+      <div className="absolute top-4 right-4 flex flex-col items-end space-y-4">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleReset}
+            className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
+            title="Restaurar disposición inicial de nodos"
+            disabled={isMapInteractionBlocked}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+            <span>Reiniciar</span>
+          </button>
+          <button
+            onClick={handleRandomize}
+            className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
+            title="Reordenar nodos aleatoriamente"
+            disabled={isMapInteractionBlocked}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Reordenar</span>
+          </button>
+          <select
+            value={selectedTarget}
+            onChange={(e) => handleTargetChange(e.target.value)}
+            className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#00718b] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[150px] max-w-[180px]"
+            disabled={isMapInteractionBlocked}
+          >
+            {targets.map((target) => (
+              <option key={target} value={target}>
+                {target === 'todos' ? 'Todos los tópicos' : target}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <Leyend className="w-[200px]" />
       </div>
       <InfoTable 
         data={selectedNode}
