@@ -51,8 +51,8 @@ const Presentation: React.FC<PresentationProps> = ({
     if (isOpen) {
       setIsVisible(true);
       // Forzar un reflow para asegurar que la animación funcione
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _ = document.body.offsetHeight;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      document.body.offsetHeight;
       setIsAnimating(true);
       
       // Prevenir scroll en el body cuando el modal está abierto

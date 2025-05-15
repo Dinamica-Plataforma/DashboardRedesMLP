@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
 import { DataSet, Network, Node, Edge, Options, IdType } from 'vis-network/standalone';
 import InfoTable from './InfoTable';
-import { MapInteractionContext } from '../page';
+import { MapInteractionContext } from '../context/MapInteractionContext';
 
 // Rutas a los JSON en public/data
 const MATRIX_PATH = '/data/df_temas_matrix.json';
