@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { MapInteractionContext } from '../page';
+import { MapInteractionContext } from '../context/MapInteractionContext';
 
 interface NodeInfo {
   nombre: string;

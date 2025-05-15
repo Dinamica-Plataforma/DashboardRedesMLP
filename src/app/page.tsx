@@ -1,17 +1,11 @@
 "use client";
 
-import { useState, useEffect, createContext } from "react";
+import { useState, useEffect } from "react";
 import Header from "./components/Header";
 import NetwordMap from "./components/NetwordMap";
 import PoweredBy from "./components/SignBottomRight"; // Importa el componente de la firma
 import Presentation from "./components/Presentation";
-
-// Contexto para controlar la interacción global con el mapa
-export const MapInteractionContext = createContext({
-  isMapInteractionBlocked: false,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setIsMapInteractionBlocked: (value: boolean) => {}
-});
+import { MapInteractionContext } from "./context/MapInteractionContext";
 
 export default function Home() {
   const [showPresentation, setShowPresentation] = useState(true);

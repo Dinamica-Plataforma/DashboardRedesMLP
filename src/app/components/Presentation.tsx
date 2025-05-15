@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapInteractionContext } from '../page';
+import { MapInteractionContext } from '../context/MapInteractionContext';
 
 interface PresentationProps {
   isOpen?: boolean;
