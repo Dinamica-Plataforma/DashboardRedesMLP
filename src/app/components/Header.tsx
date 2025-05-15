@@ -30,7 +30,7 @@ export default function Header({
         <div className="h-10 w-px bg-[#575756] mx-4" />
 
         <div>
-            <h1 className="md:text-4xl font-[400] text-[#00718b]">
+            <h1 className="md:text-3xl font-[400] text-[#00718b]">
             {title}
           </h1>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { MapInteractionContext } from '../page';
 
 interface NodeInfo {
   nombre: string;
@@ -25,6 +26,7 @@ interface InfoTableProps {
 }
 
 const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAnimation = false, onFilter, onWidthChange }) => {
+  const { setIsMapInteractionBlocked } = useContext(MapInteractionContext);
   const [activeTab, setActiveTab] = useState<'general' | 'actores' | 'plan'>('general');
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
@@ -117,6 +119,8 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
           willChange: 'transform, opacity',
           transform: isAnimating ? 'translateX(0)' : 'translateX(-100%)',
           opacity: isAnimating ? 1 : 0,
+          zIndex: 48,
+          pointerEvents: 'auto',
         }}
       >
         {/* Encabezado con título y botón cerrar */}
@@ -137,7 +141,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
           <div className="flex w-full my-6">
             <button
               onClick={() => setActiveTab('general')}
-              className={`flex-1 px-3 py-1.5 rounded-l-lg text-[16px] font-[600] transition-all duration-200
+              className={`flex-1 px-3 py-1.5 rounded-l-lg text-[14px] font-[600] transition-all duration-200
                 ${activeTab === 'general'
                   ? 'bg-[#00718b] text-white shadow-md'
                   : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
@@ -147,7 +151,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
             </button>
             <button
               onClick={() => setActiveTab('actores')}
-              className={`flex-1 px-3 py-1.5 text-[16px] font-[600] transition-all duration-200
+              className={`flex-1 px-3 py-1.5 text-[14px] font-[600] transition-all duration-200
                 ${activeTab === 'actores'
                   ? 'bg-[#00718b] text-white shadow-md'
                   : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
@@ -157,7 +161,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
             </button>
             <button
               onClick={() => setActiveTab('plan')}
-              className={`flex-1 px-3 py-1.5 rounded-r-lg text-[16px] font-[600] transition-all duration-200
+              className={`flex-1 px-3 py-1.5 rounded-r-lg text-[14px] font-[600] transition-all duration-200
                 ${activeTab === 'plan'
                   ? 'bg-[#00718b] text-white shadow-md'
                   : 'bg-gray-100 text-[#00718b] hover:bg-[#00718b]/10'
@@ -174,7 +178,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                 {/* Descripción con scroll propio */}
                 {data.descripcion && (
                   <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col">
-                    <div className="text-[15px] font-[600] text-[#00718b] mb-2 text-left">Descripción</div>
+                    <div className="text-[14px] font-[600] text-[#00718b] mb-2 text-left">Descripción</div>
                     <div className="overflow-y-auto max-h-[150px] scrollbar-custom">
                       <div className="pr-4">
                         <p className="text-[13px] text-[#575756] whitespace-pre-wrap text-justify hyphens-auto"
@@ -193,12 +197,12 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                 {/* Conexiones en una fila */}
                 <div className="grid grid-cols-2 gap-3 flex-none">
                   <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-                    <div className="text-[16px] font-[600] text-[#00718b] mb-1">Conexiones Entrantes</div>
-                    <div className="text-[20px] font-[600] text-[#575756]">{data.conexionesEntrantes}</div>
+                    <div className="text-[15px] font-[600] text-[#00718b] mb-1">Conexiones Entrantes</div>
+                    <div className="text-[16px] font-[600] text-[#575756]">{data.conexionesEntrantes}</div>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200 text-center">
-                    <div className="text-[16px] font-[600] text-[#00718b] mb-1">Conexiones Salientes</div>
-                    <div className="text-[20px] font-[600] text-[#575756]">{data.conexionesSalientes}</div>
+                    <div className="text-[15px] font-[600] text-[#00718b] mb-1">Conexiones Salientes</div>
+                    <div className="text-[16px] font-[600] text-[#575756]">{data.conexionesSalientes}</div>
                   </div>
                 </div>
 
@@ -208,8 +212,8 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                     <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="flex min-h-[80px]">
                         <div className="w-[100px] min-w-[100px] flex flex-col items-center justify-center border-r border-gray-200 pr-4">
-                          <div className="text-[16px] font-[600] text-[#00718b]">Caso Base</div>
-                          <div className={`text-[20px] mt-1 ${
+                          <div className="text-[14px] font-[600] text-[#00718b]">Caso Base</div>
+                          <div className={`text-[15px] mt-1 ${
                             data.cb?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
                             data.cb?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
                             data.cb?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
@@ -221,7 +225,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                         <div className="flex-1 pl-4 overflow-y-auto scrollbar-custom">
                           <div className="pr-4">
                             {data.cb_description ? (
-                              <p className="text-[12px] text-[#575756] text-justify leading-relaxed"
+                              <p className="text-[13px] text-[#575756] text-justify leading-relaxed"
                                  style={{ 
                                    WebkitHyphens: 'auto',
                                    msHyphens: 'auto',
@@ -232,7 +236,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                                 {data.cb_description}
                               </p>
                             ) : (
-                              <p className="text-[12px] text-gray-500 italic">Sin información.</p>
+                              <p className="text-[13px] text-gray-500 italic">Sin información.</p>
                             )}
                           </div>
                         </div>
@@ -242,8 +246,8 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                     <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="flex min-h-[80px]">
                         <div className="w-[100px] min-w-[100px] flex flex-col items-center justify-center border-r border-gray-200 pr-4">
-                          <div className="text-[16px] font-[600] text-[#00718b]">EVU</div>
-                          <div className={`text-[20px] mt-1 ${
+                          <div className="text-[14px] font-[600] text-[#00718b]">EVU</div>
+                          <div className={`text-[15px] mt-1 ${
                             data.evu?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
                             data.evu?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
                             data.evu?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
@@ -255,7 +259,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                         <div className="flex-1 pl-4 overflow-y-auto scrollbar-custom">
                           <div className="pr-4">
                             {data.evu_description ? (
-                              <p className="text-[12px] text-[#575756] text-justify leading-relaxed"
+                              <p className="text-[13px] text-[#575756] text-justify leading-relaxed"
                                  style={{ 
                                    WebkitHyphens: 'auto',
                                    msHyphens: 'auto',
@@ -266,7 +270,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                                 {data.evu_description}
                               </p>
                             ) : (
-                              <p className="text-[12px] text-gray-500 italic">Sin información.</p>
+                              <p className="text-[13px] text-gray-500 italic">Sin información.</p>
                             )}
                           </div>
                         </div>
@@ -276,8 +280,8 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                     <div className="bg-gray-50 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="flex min-h-[80px]">
                         <div className="w-[100px] min-w-[100px] flex flex-col items-center justify-center border-r border-gray-200 pr-4">
-                          <div className="text-[16px] font-[600] text-[#00718b] text-center w-full">Largo Plazo</div>
-                          <div className={`text-[20px] mt-1 ${
+                          <div className="text-[14px] font-[600] text-[#00718b] text-center w-full">Largo Plazo</div>
+                          <div className={`text-[15px] mt-1 ${
                             data.lp?.toLowerCase().trim() === 'bajo' ? 'font-[400]' :
                             data.lp?.toLowerCase().trim() === 'medio' ? 'font-[600]' :
                             data.lp?.toLowerCase().trim() === 'alto' ? 'font-[800]' :
@@ -289,7 +293,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                         <div className="flex-1 pl-4 overflow-y-auto scrollbar-custom">
                           <div className="pr-4">
                             {data.lp_description ? (
-                              <p className="text-[12px] text-[#575756] text-justify leading-relaxed"
+                              <p className="text-[13px] text-[#575756] text-justify leading-relaxed"
                                  style={{ 
                                    WebkitHyphens: 'auto',
                                    msHyphens: 'auto',
@@ -300,7 +304,7 @@ const InfoTable: React.FC<InfoTableProps> = ({ data, isVisible, onClose, skipAni
                                 {data.lp_description}
                               </p>
                             ) : (
-                              <p className="text-[12px] text-gray-500 italic">Sin información.</p>
+                              <p className="text-[13px] text-gray-500 italic">Sin información.</p>
                             )}
                           </div>
                         </div>

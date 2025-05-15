@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import { DataSet, Network, Node, Edge, Options, IdType } from 'vis-network/standalone';
 import InfoTable from './InfoTable';
+import { MapInteractionContext } from '../page';
 
 // Rutas a los JSON en public/data
 const MATRIX_PATH = '/data/df_temas_matrix.json';
@@ -36,6 +37,15 @@ const ANIMATION_DURATION = 300;
 const EASING_FUNCTION = 'easeInOutQuad';
 
 const NetworkMap: React.FC = () => {
+  // Obtener el estado global de interacción del mapa
+  const { isMapInteractionBlocked } = useContext(MapInteractionContext);
+  const isMapInteractionBlockedRef = useRef(isMapInteractionBlocked);
+  
+  // Actualizar la referencia cuando cambia el estado
+  useEffect(() => {
+    isMapInteractionBlockedRef.current = isMapInteractionBlocked;
+  }, [isMapInteractionBlocked]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const initialPositionsRef = useRef<Record<IdType, {x: number, y: number}> | null>(null);
   const networkInitializedRef = useRef(false);
@@ -68,6 +78,9 @@ const NetworkMap: React.FC = () => {
   const temporalidadRef = useRef<TemporalidadMatrix | null>(null);
   const matrixRef = useRef<Matrix | null>(null);
   const descriptionsRef = useRef<DescriptionsMatrix | null>(null);
+
+  // Referencia para el controlador de animación
+  const animationFrameIdRef = useRef<number | null>(null);
 
   const performDeselectActions = (shouldMoveMap: boolean) => {
     if (networkRef.current && shouldMoveMap) {
@@ -346,11 +359,13 @@ const NetworkMap: React.FC = () => {
     let hideTimeout: NodeJS.Timeout | null = null;
     let lastEdgeId: IdType | null = null;
     let isHovering = false;
-    let animationFrameId: number;
 
     const handleMouseMove = (e: MouseEvent) => {
+      // Actualizar la posición del mouse sin importar si está bloqueado o no
       lastMousePos = { x: e.clientX, y: e.clientY };
-      if (currentEdge && tooltipRef.current) {
+      
+      // Actualizar la posición del tooltip solo si hay un borde actual y no está bloqueado
+      if (currentEdge && tooltipRef.current && !isMapInteractionBlockedRef.current) {
         tooltipRef.current.style.left = `${e.clientX + 5}px`;
         tooltipRef.current.style.top = `${e.clientY + 5}px`;
       }
@@ -359,7 +374,8 @@ const NetworkMap: React.FC = () => {
     window.addEventListener('mousemove', handleMouseMove);
 
     const showTooltip = (edge: Edge) => {
-      if (!tooltipRef.current) return;
+      // No mostrar tooltips si la interacción está bloqueada
+      if (isMapInteractionBlockedRef.current || !tooltipRef.current) return;
       
       if (hoverTimeout) clearTimeout(hoverTimeout);
       if (hideTimeout) clearTimeout(hideTimeout);
@@ -383,7 +399,28 @@ const NetworkMap: React.FC = () => {
     };
 
     const detectLoop = () => {
-      if (!containerRef.current || !networkRef.current || !tooltipRef.current || !edgesDsRef.current) return;
+      // Cancelar el loop anterior si existe
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+      
+      // No detectar hovers si la interacción está bloqueada
+      if (isMapInteractionBlockedRef.current) {
+        // Ocultar cualquier tooltip visible
+        if (currentEdge !== null) {
+          currentEdge = null;
+          lastEdgeId = null;
+          hideTooltip();
+        }
+        // Continuar el loop
+        animationFrameIdRef.current = requestAnimationFrame(detectLoop);
+        return;
+      }
+
+      if (!containerRef.current || !networkRef.current || !tooltipRef.current || !edgesDsRef.current) {
+        animationFrameIdRef.current = requestAnimationFrame(detectLoop);
+        return;
+      }
 
       const rect = containerRef.current.getBoundingClientRect();
       const xCanvas = lastMousePos.x - rect.left;
@@ -433,7 +470,7 @@ const NetworkMap: React.FC = () => {
         hideTooltip();
       }
       
-      animationFrameId = requestAnimationFrame(detectLoop);
+      animationFrameIdRef.current = requestAnimationFrame(detectLoop);
     };
 
     // Ocultar tooltip nativo
@@ -771,11 +808,21 @@ const NetworkMap: React.FC = () => {
       if (styleEl) {
         document.head.removeChild(styleEl);
       }
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
       }
+      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []); // Solo se ejecuta una vez al montar
+
+  // Efecto para manejar cambios en el estado de bloqueo
+  useEffect(() => {
+    // Ocultar el tooltip cuando la interacción está bloqueada
+    if (isMapInteractionBlocked && tooltipRef.current) {
+      tooltipRef.current.style.display = 'none';
+      tooltipRef.current.style.opacity = '0';
+    }
+  }, [isMapInteractionBlocked]);
 
   const handleTargetChange = (target: string) => {
     if (!networkRef.current || !nodesDsRef.current || !edgesDsRef.current || !matrixRef.current || !temporalidadRef.current) return;
@@ -923,6 +970,7 @@ const NetworkMap: React.FC = () => {
           onClick={handleReset}
           className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
           title="Restaurar disposición inicial de nodos"
+          disabled={isMapInteractionBlocked}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -933,6 +981,7 @@ const NetworkMap: React.FC = () => {
           onClick={handleRandomize}
           className="bg-[#00718b] text-white px-4 py-2 rounded-lg shadow-lg hover:bg-[#00718b]/90 transition-colors duration-200 flex items-center space-x-2"
           title="Reordenar nodos aleatoriamente"
+          disabled={isMapInteractionBlocked}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -943,6 +992,7 @@ const NetworkMap: React.FC = () => {
           value={selectedTarget}
           onChange={(e) => handleTargetChange(e.target.value)}
           className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-[#00718b] focus:outline-none focus:ring-2 focus:ring-[#186170] focus:border-transparent min-w-[150px] max-w-[180px]"
+          disabled={isMapInteractionBlocked}
         >
           {targets.map((target) => (
             <option key={target} value={target}>
